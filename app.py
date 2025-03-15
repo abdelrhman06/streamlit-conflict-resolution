@@ -27,9 +27,10 @@ if uploaded_file:
 
     groups.columns = groups.columns.str.strip()
 
-    physical_sessions["Event Start Date"] = pd.to_datetime(physical_sessions["Event Start Date"])
-    connect_sessions_l1["Event Start Date"] = pd.to_datetime(connect_sessions_l1["Event Start Date"])
-    connect_sessions_l2["Event Start Date"] = pd.to_datetime(connect_sessions_l2["Event Start Date"])
+    physical_sessions["Event Start Date"] = pd.to_datetime(physical_sessions["Event Start Date"], errors='coerce')
+    connect_sessions_l1["Event Start Date"] = pd.to_datetime(connect_sessions_l1["Event Start Date"], errors='coerce')
+    connect_sessions_l2["Event Start Date"] = pd.to_datetime(connect_sessions_l2["Event Start Date"], errors='coerce')
+    groups["Event Start Time"] = pd.to_datetime(groups["Event Start Time"], format='%H:%M:%S', errors='coerce')
 
     def extract_session_info(session_code, username, df_groups):
         if isinstance(session_code, str):
@@ -90,7 +91,7 @@ if uploaded_file:
                         (groups["Language Type"] == language) &
                         (groups["Grade"].str.contains(grade.split()[-1], na=False)) &
                         (groups["Weekday"] == day) &
-                        (groups["Event Start Time"] == time)
+                        (groups["Event Start Time"].notnull())
                     ]
                     for _, group in possible_groups.iterrows():
                         session_code = group["Session Code"]
@@ -99,9 +100,10 @@ if uploaded_file:
                         if session_code not in group_counts:
                             group_counts[session_code] = connect_sessions[connect_sessions["Session Code"] == session_code].shape[0]
                         if 15 < group_counts[session_code] < 35:
-                            new_group_time = pd.to_datetime(group["Event Start Time"])
-                            if physical_group_time is not None and time_difference(new_group_time, physical_group_time) < 2.5:
-                                continue  # ❌ Avoid conflict with physical session if < 2.5 hours
+                            new_group_time = group["Event Start Time"]
+                            if pd.notnull(physical_group_time) and pd.notnull(new_group_time):
+                                if time_difference(new_group_time, physical_group_time) < 2.5:
+                                    continue  # ❌ Avoid conflict if < 2.5 hours
                             group_counts[session_code] += 1
                             return session_code, new_group_time, group_counts[session_code]
                     return None, None, None
