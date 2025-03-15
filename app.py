@@ -4,15 +4,21 @@ import io
 import re
 
 
+import streamlit as st
+
+import streamlit as st
+
+
 st.title("📊 Finding Another Group for Students")
 st.write("""
-Enter your preferred day and time to find an alternative group that suits your schedule.  
+Enter the day and time the student wants to find a new group that suits them.  
 
 This application was developed by **Abdelrahman Salah**.  
-Dedicated to **Team DConnect**.  
+Dedicated to **the Connect Team**.  
 
 Part of **Almentor**.
 """)
+
 uploaded_file = st.file_uploader("تحميل ملف Excel", type=["xlsx"])
 
 if uploaded_file:
