@@ -97,13 +97,12 @@ if uploaded_file:
             physical_info = physical_sessions[physical_sessions["Username"] == username]
             
             physical_group = physical_info["Session Code"].values[0] if not physical_info.empty else None
-            physical_group_time = physical_info["Event Start Date"].values[0] if not physical_info.empty else None
+            physical_group_time = physical_info["Event Start Date"].dt.time.values[0] if not physical_info.empty else None
             
             conflict = False
 
             if not student_info.empty:
                 student_row = student_info.iloc[0]
-                level, language, grade = student_row["Level"], student_row["Language"], student_row["Grade"]
                 old_group = student_row["Session Code"]
                 old_group_time = student_row["Event Start Date"].time()
                 
@@ -147,7 +146,6 @@ if uploaded_file:
     output.seek(0)
 
     # توفير زر لتحميل التقرير
-    st.write("✅ تم معالجة البيانات بنجاح. انقر أدناه لتنزيل التقرير.")
     st.download_button(
         label="📥 تنزيل التقرير",
         data=output,
