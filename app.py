@@ -23,26 +23,22 @@ if uploaded_file:
     session_requests_l1 = pd.read_excel(xls, sheet_name='Session Requests L1')
     session_requests_l2 = pd.read_excel(xls, sheet_name='Session Requests L2')
 
-    # طباعة أسماء الأعمدة لمعرفة الأخطاء إن وجدت
-    print("Groups Columns:", groups.columns.tolist())
-
     # تنظيف أسماء الأعمدة
     groups.columns = groups.columns.str.strip()
     physical_sessions.columns = physical_sessions.columns.str.strip()
     
     # البحث عن عمود Grade بشكل ديناميكي
-    grade_col = [col for col in groups.columns if "Grade" in col][0]  # يختار العمود الذي يحتوي على "Grade"
+    grade_col = [col for col in groups.columns if "Grade" in col][0]
     groups["Grade"] = groups[grade_col].str.strip()
     
     # تحويل التواريخ إلى datetime
-    physical_sessions["Event Date"] = pd.to_datetime(physical_sessions["Event Date"], errors='coerce')
     physical_sessions["Event Start Date"] = pd.to_datetime(physical_sessions["Event Start Date"], errors='coerce')
     connect_sessions_l1["Event Start Date"] = pd.to_datetime(connect_sessions_l1["Event Start Date"], errors='coerce')
     connect_sessions_l2["Event Start Date"] = pd.to_datetime(connect_sessions_l2["Event Start Date"], errors='coerce')
     groups["Event Start Time"] = pd.to_datetime(groups["Event Start Time"], format="%H:%M:%S", errors='coerce').dt.time
     
     # استخراج اليوم من التواريخ
-    physical_sessions["Day"] = physical_sessions["Event Date"].dt.day_name()
+    physical_sessions["Day"] = physical_sessions["Event Start Date"].dt.day_name()
     connect_sessions_l1["Day"] = connect_sessions_l1["Event Start Date"].dt.day_name()
     connect_sessions_l2["Day"] = connect_sessions_l2["Event Start Date"].dt.day_name()
     groups["Day"] = groups["Weekday"]
@@ -54,7 +50,7 @@ if uploaded_file:
             try:
                 return datetime.strptime(value, "%H:%M:%S").time()
             except ValueError:
-                return None  # لو لم يكن بتنسيق الوقت الصحيح، يتم إرجاع None
+                return None
         return None
 
     # إنشاء قاموس لتتبع عدد الطلاب في كل جروب
@@ -72,7 +68,6 @@ if uploaded_file:
                 level = "Level 2" if session_code[1].isdigit() else "Level 1"
                 language = "Arabic" if "A" in session_code else "English"
                 grade = "Unknown"
-
             return level, language, grade
         return None, None, None
 
@@ -115,14 +110,17 @@ if uploaded_file:
                 for _, group in groups.iterrows():
                     session_code = group["Session Code"]
                     if session_code == old_group:
-                        continue  # ✅ تجنب اختيار نفس الجروب القديم
+                        continue
                     if session_code not in group_counts:
                         group_counts[session_code] = connect_sessions[connect_sessions["Session Code"] == session_code].shape[0]
                     if 15 < group_counts[session_code] < 35:
                         group_counts[session_code] += 1
                         new_group = session_code
                         new_group_time = group["Event Start Time"]
-                        conflict = (physical_group_time == new_group_time)  # ✅ التحقق من وجود تعارض في الوقت
+                        conflict = False
+                        if physical_group_time and new_group_time:
+                            time_diff = abs(datetime.combine(datetime.today(), new_group_time) - datetime.combine(datetime.today(), physical_group_time))
+                            conflict = time_diff.total_seconds() / 3600 < 2.5
                         break
                 else:
                     new_group = "No Suitable Group"
