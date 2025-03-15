@@ -3,9 +3,13 @@ import pandas as pd
 import io
 import re
 from datetime import datetime, timedelta
+import sys
+
+# التأكد من دعم UTF-8
+sys.stdout.reconfigure(encoding='utf-8')
 
 # عنوان التطبيق
-st.title("\ud83d\udcca نظام حل تعارض الجلسات")
+st.write("📊 **نظام حل تعارض الجلسات**")
 st.write("قم بتحميل ملف Excel الخاص بك للحصول على تقرير تعارض الجلسات.")
 
 # تحميل ملف Excel
