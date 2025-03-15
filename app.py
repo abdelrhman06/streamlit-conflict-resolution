@@ -36,6 +36,9 @@ if uploaded_file:
     connect_sessions_l1["Event Start Date"] = pd.to_datetime(connect_sessions_l1["Event Start Date"], errors='coerce')
     connect_sessions_l2["Event Start Date"] = pd.to_datetime(connect_sessions_l2["Event Start Date"], errors='coerce')
 
+    # 🔍 استخراج اليوم من `Event Start Date`
+    physical_sessions["Weekday"] = physical_sessions["Event Start Date"].dt.day_name()
+
     # 🔹 استخراج اليوم من `Session Code`
     def get_day_from_session_code(session_code):
         if isinstance(session_code, str):
@@ -48,10 +51,7 @@ if uploaded_file:
             if "Su" in session_code: return "Sunday"
         return "Unknown"
 
-    # 📌 استخراج اليوم من `Event Start Date` في `Physical Sessions`
-    physical_sessions["Weekday"] = physical_sessions["Event Start Date"].dt.day_name()
-
-    # 📝 إضافة اليوم إلى جدول `Groups`
+    # إضافة اليوم إلى جدول `Groups`
     groups["Weekday"] = groups["Session Code"].astype(str).apply(get_day_from_session_code)
 
     # 📌 تطبيق استخراج اليوم في `Connect Sessions`
@@ -66,7 +66,7 @@ if uploaded_file:
             if not group_info.empty:
                 level = group_info.iloc[0].get("Level", "Unknown")
                 language = group_info.iloc[0].get("Language Type", "Unknown")
-                grade = group_info.iloc[0].get("Grade", group_info.iloc[0].get("Grade ", "Unknown"))  # معالجة المسافة الزائدة
+                grade = group_info.iloc[0].get("Grade", group_info.iloc[0].get("Grade ", "Unknown"))
             else:
                 level = "Level 2" if session_code[1].isdigit() else "Level 1"
                 language = "Arabic" if "A" in session_code else "English"
@@ -83,7 +83,7 @@ if uploaded_file:
     for df in [connect_sessions_l1, connect_sessions_l2]:
         df[["Level", "Language", "Grade"]] = df.apply(lambda row: pd.Series(extract_session_info(row["Session Code"], row["Username"], groups)), axis=1)
 
-    # 🔍 دالة لحساب فرق الساعات بين جلستين
+    # دالة لحساب فرق الساعات بين جلستين
     def time_difference(time1, time2):
         return abs((pd.Timestamp.combine(pd.Timestamp.today(), time1) - pd.Timestamp.combine(pd.Timestamp.today(), time2)).total_seconds() / 3600)
 
@@ -97,6 +97,8 @@ if uploaded_file:
         [connect_sessions_l1, connect_sessions_l2]
     ):
         session_requests = session_requests.copy()
+        updated_requests = []
+
         for _, row in session_requests.iterrows():
             username = row["Username"]
             requested_day, requested_time = row["Requested Day"], row["Requested Time"]
@@ -133,15 +135,14 @@ if uploaded_file:
                         if physical_group_time and physical_group_day == new_group_day and time_difference(new_group_time, physical_group_time) < 2.5:
                             continue  # ❌ يعتبر conflict
 
-                        if session_code not in group_counts:
-                            group_counts[session_code] = connect_sessions[connect_sessions["Session Code"] == session_code].shape[0]
-
-                        if 15 < group_counts[session_code] < 35:
-                            group_counts[session_code] += 1
-                            return session_code, new_group_time, group_counts[session_code]
+                        return session_code, new_group_time, group_counts.get(session_code, 0) + 1
                     return None, None, None
 
                 new_group, new_group_time, new_group_count = find_alternative_group(requested_day, requested_time) or find_alternative_group(requested_day, alternative_time1) or find_alternative_group(requested_day, alternative_time2) or ("No Suitable Group", None, None)
+
+                updated_requests.append(row.tolist() + [new_group, new_group_time, new_group_count])
+
+        sheets[sheet_name] = pd.DataFrame(updated_requests, columns=list(session_requests.columns) + ["New Group", "New Group Time", "New Group Student Count"])
 
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
