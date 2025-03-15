@@ -18,22 +18,26 @@ uploaded_file = st.file_uploader("Upload an Excel file", type=["xlsx"])
 if uploaded_file:
     xls = pd.ExcelFile(uploaded_file)
 
-    physical_sessions = pd.read_excel(xls, sheet_name='Physical Sessions')
-    connect_sessions_l1 = pd.read_excel(xls, sheet_name='Connect Sessions L1')
-    connect_sessions_l2 = pd.read_excel(xls, sheet_name='Connect Sessions L2')
-    groups = pd.read_excel(xls, sheet_name='Groups')
-    session_requests_l1 = pd.read_excel(xls, sheet_name='Session Requests L1')
-    session_requests_l2 = pd.read_excel(xls, sheet_name='Session Requests L2')
+    try:
+        physical_sessions = pd.read_excel(xls, sheet_name='Physical Sessions')
+        connect_sessions_l1 = pd.read_excel(xls, sheet_name='Connect Sessions L1')
+        connect_sessions_l2 = pd.read_excel(xls, sheet_name='Connect Sessions L2')
+        groups = pd.read_excel(xls, sheet_name='Groups')
+        session_requests_l1 = pd.read_excel(xls, sheet_name='Session Requests L1')
+        session_requests_l2 = pd.read_excel(xls, sheet_name='Session Requests L2')
+    except Exception as e:
+        st.write(f"❌ Error loading Excel sheets: {e}")
+        st.stop()
 
     groups.columns = groups.columns.str.strip()
 
     physical_sessions["Event Start Date"] = pd.to_datetime(physical_sessions["Event Start Date"], errors='coerce')
     connect_sessions_l1["Event Start Date"] = pd.to_datetime(connect_sessions_l1["Event Start Date"], errors='coerce')
     connect_sessions_l2["Event Start Date"] = pd.to_datetime(connect_sessions_l2["Event Start Date"], errors='coerce')
-    groups["Event Start Time"] = pd.to_datetime(groups["Event Start Time"], format='%H:%M:%S', errors='coerce').dt.time
+    groups["Event Start Time"] = pd.to_datetime(groups["Event Start Time"], errors='coerce').dt.time
 
     def extract_grade_from_username(username):
-        grade_match = re.search(r"G(\d+)", username)
+        grade_match = re.search(r"G(\d+)", str(username))
         return f"Grade {grade_match.group(1)}" if grade_match else "Unknown"
 
     def get_day_from_session_code(session_code):
@@ -45,14 +49,14 @@ if uploaded_file:
         return None
 
     for df in [connect_sessions_l1, connect_sessions_l2]:
-        df["Session Day"] = df["Session Code"].apply(get_day_from_session_code)
+        df["Session Day"] = df["Session Code"].astype(str).apply(get_day_from_session_code)
         df["Event Start Time"] = df["Event Start Date"].dt.time
 
     sheets = {"Session Requests L1": pd.DataFrame(), "Session Requests L2": pd.DataFrame()}
     group_counts = {}
 
     for session_requests, sheet_name, connect_sessions in zip(
-        [session_requests_l1, session_requests_l2],
+        [session_requests_l1.copy(), session_requests_l2.copy()],
         ["Session Requests L1", "Session Requests L2"],
         [connect_sessions_l1, connect_sessions_l2]
     ):
@@ -88,7 +92,7 @@ if uploaded_file:
                     possible_groups = groups[
                         (groups["Level"].str.strip().str.lower() == level.strip().lower()) &
                         (groups["Language Type"].str.strip().str.lower() == language.strip().lower()) &
-                        (groups["Grade"].str.contains(grade.split()[-1], na=False)) &
+                        (groups["Grade"].astype(str).str.contains(grade.split()[-1], na=False)) &
                         (groups["Weekday"].str.strip().str.lower() == day.strip().lower()) &
                         (groups["Event Start Time"].notnull())
                     ]
