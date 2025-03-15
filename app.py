@@ -19,7 +19,7 @@ Dedicated to **the Connect Team**.
 Part of **Almentor**.
 """)
 
-uploaded_file = st.file_uploader("تحميل ملف Excel", type=["xlsx"])
+uploaded_file = st.file_uploader("Upload an Excel file", type=["xlsx"])
 
 if uploaded_file:
     xls = pd.ExcelFile(uploaded_file)
