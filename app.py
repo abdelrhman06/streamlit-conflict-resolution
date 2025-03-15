@@ -31,9 +31,9 @@ if uploaded_file:
     physical_sessions.columns = physical_sessions.columns.str.strip()
 
     # تحويل التواريخ
-    physical_sessions["Event Start Date"] = pd.to_datetime(physical_sessions["Event Start Date"])
-    connect_sessions_l1["Event Start Date"] = pd.to_datetime(connect_sessions_l1["Event Start Date"])
-    connect_sessions_l2["Event Start Date"] = pd.to_datetime(connect_sessions_l2["Event Start Date"])
+    physical_sessions["Event Start Date"] = pd.to_datetime(physical_sessions["Event Start Date"], errors='coerce')
+    connect_sessions_l1["Event Start Date"] = pd.to_datetime(connect_sessions_l1["Event Start Date"], errors='coerce')
+    connect_sessions_l2["Event Start Date"] = pd.to_datetime(connect_sessions_l2["Event Start Date"], errors='coerce')
 
     # استخراج اليوم
     physical_sessions["Day"] = physical_sessions["Event Start Date"].dt.day_name()
@@ -91,8 +91,12 @@ if uploaded_file:
                 level, language, grade = student_row["Level"], student_row["Language"], student_row["Grade"]
                 old_group = student_row["Session Code"]
                 old_group_time = student_row["Event Start Date"].time()
-                physical_group_time = physical_info["Event Start Date"].values[0].time() if not physical_info.empty else None
                 
+                # التحقق من الجلسة الفعلية لتجنب الأخطاء
+                physical_group_time = None
+                if not physical_info.empty and pd.notna(physical_info["Event Start Date"].values[0]):
+                    physical_group_time = physical_info["Event Start Date"].values[0].time()
+
                 def find_alternative_group(day, time):
                     possible_groups = groups[
                         (groups["Level"] == level) &
