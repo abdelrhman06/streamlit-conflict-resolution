@@ -88,7 +88,7 @@ if uploaded_file:
                         (groups["Level"] == level) &
                         (groups["Language Type"] == language) &
                         (groups["Grade"].str.contains(grade.split()[-1], na=False)) &
-                        (groups["Weekday"] == old_group_day) &
+                        (groups["Weekday"].str.strip().str.lower() == old_group_day.lower()) &
                         (groups["Event Start Time"].notnull())
                     ]
                     for _, group in possible_groups.iterrows():
