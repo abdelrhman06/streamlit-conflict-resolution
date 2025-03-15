@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import io
 import re
+from datetime import datetime
 
 # عنوان التطبيق
 st.title("📊 نظام حل تعارض الجلسات")
@@ -25,12 +26,14 @@ if uploaded_file:
     # تنظيف أسماء الأعمدة
     groups.columns = groups.columns.str.strip()
     physical_sessions.columns = physical_sessions.columns.str.strip()
+    groups["Grade"] = groups["Grade "].str.strip()
     
     # تحويل التواريخ إلى datetime
     physical_sessions["Event Date"] = pd.to_datetime(physical_sessions["Event Date"], errors='coerce')
     physical_sessions["Event Start Date"] = pd.to_datetime(physical_sessions["Event Start Date"], errors='coerce')
     connect_sessions_l1["Event Start Date"] = pd.to_datetime(connect_sessions_l1["Event Start Date"], errors='coerce')
     connect_sessions_l2["Event Start Date"] = pd.to_datetime(connect_sessions_l2["Event Start Date"], errors='coerce')
+    groups["Event Start Time"] = pd.to_datetime(groups["Event Start Time"], format="%H:%M:%S", errors='coerce').dt.time
     
     # استخراج اليوم من التواريخ
     physical_sessions["Day"] = physical_sessions["Event Date"].dt.day_name()
@@ -45,15 +48,11 @@ if uploaded_file:
             if not group_info.empty:
                 level = group_info.iloc[0]["Level"]
                 language = group_info.iloc[0].get("Language Type", group_info.iloc[0].get("Language"))
-                grade = group_info.iloc[0].get("Grade ", group_info.iloc[0].get("Grade"))
+                grade = group_info.iloc[0].get("Grade", "Unknown")
             else:
                 level = "Level 2" if session_code[1].isdigit() else "Level 1"
                 language = "Arabic" if "A" in session_code else "English"
-                grade = None
-
-            if grade is None:
-                grade_match = re.search(r"G(\d+)", username)
-                grade = f"Grade {grade_match.group(1)}" if grade_match else "Unknown"
+                grade = "Unknown"
 
             return level, language, grade
         return None, None, None
@@ -76,9 +75,9 @@ if uploaded_file:
         for _, row in session_requests.iterrows():
             username = row["Username"]
             requested_day = row["Requested Day"]
-            requested_time = row["Requested Time"]
-            alternative_time1 = row["Alternative Time 1"]
-            alternative_time2 = row["Alternative Time 2"]
+            requested_time = datetime.strptime(row["Requested Time"], "%H:%M:%S").time()
+            alternative_time1 = datetime.strptime(row["Alternative Time 1"], "%H:%M:%S").time() if pd.notna(row["Alternative Time 1"]) else None
+            alternative_time2 = datetime.strptime(row["Alternative Time 2"], "%H:%M:%S").time() if pd.notna(row["Alternative Time 2"]) else None
 
             student_info = connect_sessions[connect_sessions["Username"] == username]
 
@@ -88,22 +87,22 @@ if uploaded_file:
                 old_group = student_row["Session Code"]
                 old_group_time = student_row["Event Start Date"].time()
                 
-                physical_info = physical_sessions[physical_sessions["Username"] == username]
-                if not physical_info.empty:
-                    physical_group = physical_info["Session Code"].values[0]
-                    physical_group_time = physical_info["Event Start Date"].values[0]
-                    physical_group_day = physical_info["Event Date"].dt.day_name().values[0]
-                else:
-                    physical_group = None
-                    physical_group_time = None
-                    physical_group_day = None
+                possible_groups = groups[
+                    (groups["Level"] == level) &
+                    (groups["Language Type"] == language) &
+                    (groups["Grade"] == grade) &
+                    (groups["Day"] == requested_day)
+                ]
+
+                new_group = possible_groups.iloc[0]["Session Code"] if not possible_groups.empty else "No Suitable Group"
+                new_group_time = possible_groups.iloc[0]["Event Start Time"] if not possible_groups.empty else None
 
                 session_requests.loc[session_requests["Username"] == username, [
-                    "New Group", "New Group Time", "New Group Student Count",
-                    "Old Group", "Old Group Time", "Physical Group", "Physical Group Time", "Physical Group Day"
+                    "New Group", "New Group Time",
+                    "Old Group", "Old Group Time"
                 ]] = [
-                    "No Suitable Group", None, None,
-                    old_group, old_group_time, physical_group, physical_group_time, physical_group_day
+                    new_group, new_group_time,
+                    old_group, old_group_time
                 ]
                 sheets[sheet_name] = pd.concat([sheets[sheet_name], session_requests[session_requests["Username"] == username]], ignore_index=True)
 
