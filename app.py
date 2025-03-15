@@ -58,7 +58,7 @@ if uploaded_file:
         return None
 
     # إنشاء قاموس لتتبع عدد الطلاب في كل جروب
-    group_counts = {code: 0 for code in groups["Session Code"].unique()}
+    group_counts = {code: 5 for code in groups["Session Code"].unique()}  # يبدأ من 5
     
     # استخراج المستوى واللغة والصف الدراسي
     def extract_session_info(session_code, username, df_groups):
@@ -111,10 +111,9 @@ if uploaded_file:
                     (groups["Language Type"] == language) &
                     (groups["Grade"] == grade) &
                     (groups["Day"] == requested_day) &
-                    (groups["Session Code"] != old_group)  # التأكد من أن الجروب الجديد ليس نفس القديم
+                    (groups["Session Code"] != old_group) &  # التأكد من أن الجروب الجديد ليس نفس القديم
+                    (groups["Session Code"].map(lambda x: 5 <= group_counts.get(x, 0) < 35))
                 ]
-                
-                possible_groups = possible_groups[possible_groups["Session Code"].map(lambda x: group_counts.get(x, 0)) < 35]
                 
                 if not possible_groups.empty:
                     new_group = possible_groups.iloc[0]["Session Code"]
@@ -125,10 +124,11 @@ if uploaded_file:
                     new_group_time = None
 
                 session_requests.loc[session_requests["Username"] == username, [
-                    "New Group", "New Group Time", "Old Group", "Old Group Time"
+                    "New Group", "New Group Time", "Old Group", "Old Group Time", "New Group Count"
                 ]] = [
                     new_group, new_group_time,
-                    old_group, old_group_time
+                    old_group, old_group_time,
+                    group_counts.get(new_group, 0)
                 ]
                 sheets[sheet_name] = pd.concat([sheets[sheet_name], session_requests[session_requests["Username"] == username]], ignore_index=True)
 
