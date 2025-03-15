@@ -38,6 +38,14 @@ if uploaded_file:
     connect_sessions_l2["Day"] = connect_sessions_l2["Event Start Date"].dt.day_name()
     groups["Day"] = groups["Weekday"]
 
+    # إضافة اليوم إلى session_requests
+    session_requests_l1 = session_requests_l1.merge(
+        physical_sessions[["Username", "Physical Day"]], on="Username", how="left"
+    )
+    session_requests_l2 = session_requests_l2.merge(
+        physical_sessions[["Username", "Physical Day"]], on="Username", how="left"
+    )
+
     # تجهيز ملف الإخراج
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
