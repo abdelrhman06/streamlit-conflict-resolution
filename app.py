@@ -76,13 +76,13 @@ if uploaded_file:
                 student_row = student_info.iloc[0]
                 level, language, grade = student_row["Level"], student_row["Language"], student_row["Grade"]
                 old_group = student_row["Session Code"]
-                old_group_time = student_row["Event Start Date"].time()
+                old_group_time = student_row["Event Start Date"]
                 physical_info = physical_sessions[physical_sessions["Username"] == username]
                 physical_group = physical_info["Session Code"].values[0] if not physical_info.empty else None
-                physical_group_time = physical_info["Event Start Date"].dt.time.values[0] if not physical_info.empty else None
+                physical_group_time = physical_info["Event Start Date"].values[0] if not physical_info.empty else None
 
                 def time_difference(time1, time2):
-                    return abs((pd.Timestamp(time1) - pd.Timestamp(time2)).total_seconds() / 3600)
+                    return abs((time1 - time2).total_seconds() / 3600)
 
                 def find_alternative_group(day, time):
                     possible_groups = groups[
@@ -99,10 +99,11 @@ if uploaded_file:
                         if session_code not in group_counts:
                             group_counts[session_code] = connect_sessions[connect_sessions["Session Code"] == session_code].shape[0]
                         if 15 < group_counts[session_code] < 35:
-                            if physical_group_time and time_difference(group["Event Start Time"], physical_group_time) < 2.5:
+                            new_group_time = pd.to_datetime(group["Event Start Time"])
+                            if physical_group_time is not None and time_difference(new_group_time, physical_group_time) < 2.5:
                                 continue  # ❌ Avoid conflict with physical session if < 2.5 hours
                             group_counts[session_code] += 1
-                            return session_code, group["Event Start Time"], group_counts[session_code]
+                            return session_code, new_group_time, group_counts[session_code]
                     return None, None, None
 
                 new_group, new_group_time, new_group_count = find_alternative_group(requested_day, requested_time)
