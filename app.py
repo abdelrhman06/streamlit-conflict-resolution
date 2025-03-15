@@ -85,7 +85,9 @@ if uploaded_file:
                     if day is None or time is None:
                         return None, None, None
                     
-                    # تصحيح مقارنة الأيام
+                    # Debugging output
+                    st.write(f"Looking for groups on {day} at {time} for Level: {level}, Language: {language}, Grade: {grade}")
+                    
                     possible_groups = groups[
                         (groups["Level"].str.strip().str.lower() == level.strip().lower()) &
                         (groups["Language Type"].str.strip().str.lower() == language.strip().lower()) &
@@ -93,6 +95,8 @@ if uploaded_file:
                         (groups["Weekday"].str.strip().str.lower() == old_group_day.strip().lower()) &
                         (groups["Event Start Time"].notnull())
                     ]
+                    
+                    st.write(f"Found {len(possible_groups)} possible groups before filtering.")
                     
                     for _, group in possible_groups.iterrows():
                         session_code = group["Session Code"]
