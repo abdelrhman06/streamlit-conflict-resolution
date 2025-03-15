@@ -33,6 +33,7 @@ if uploaded_file:
 
     # استخراج اليوم من التواريخ
     physical_sessions["Day"] = physical_sessions["Event Date"].dt.day_name()
+    physical_sessions["Physical Day"] = physical_sessions["Event Start Date"].dt.day_name()
     connect_sessions_l1["Day"] = connect_sessions_l1["Event Start Date"].dt.day_name()
     connect_sessions_l2["Day"] = connect_sessions_l2["Event Start Date"].dt.day_name()
     groups["Day"] = groups["Weekday"]
@@ -116,25 +117,6 @@ if uploaded_file:
                     new_group, new_group_time, new_group_count = find_alternative_group(requested_day, alternative_time2)
                 if new_group is None:
                     new_group, new_group_time, new_group_count = "No Suitable Group", None, None
-
-                session_requests.loc[session_requests["Username"] == username, [
-                    "New Group", "New Group Time", "New Group Student Count",
-                    "Old Group", "Old Group Time", "Physical Group", "Physical Group Time"
-                ]] = [
-                    new_group, new_group_time, new_group_count,
-                    old_group, old_group_time, physical_group, physical_group_time
-                ]
-                sheets[sheet_name] = pd.concat([sheets[sheet_name], session_requests[session_requests["Username"] == username]], ignore_index=True)
-
-    # حفظ النتائج في ملف Excel في الذاكرة
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        for sheet_name, df in sheets.items():
-            df.to_excel(writer, sheet_name=sheet_name, index=False)
-        session_requests_l1.to_excel(writer, sheet_name="Session Requests L1", index=False)
-        session_requests_l2.to_excel(writer, sheet_name="Session Requests L2", index=False)
-        writer.close()
-        processed_data = output.getvalue()
 
     # توفير زر لتحميل التقرير
     st.write("✅ تم معالجة البيانات بنجاح. انقر أدناه لتنزيل التقرير.")
