@@ -40,10 +40,10 @@ if uploaded_file:
 
     # إضافة اليوم إلى session_requests
     session_requests_l1 = session_requests_l1.merge(
-        physical_sessions[["Username", "Physical Day"]], on="Username", how="left"
+        physical_sessions[["Username", "Physical Day", "Day"]], on="Username", how="left"
     )
     session_requests_l2 = session_requests_l2.merge(
-        physical_sessions[["Username", "Physical Day"]], on="Username", how="left"
+        physical_sessions[["Username", "Physical Day", "Day"]], on="Username", how="left"
     )
 
     # تجهيز ملف الإخراج
