@@ -68,11 +68,11 @@ if uploaded_file:
             if not student_info.empty:
                 student_row = student_info.iloc[0]
                 level = student_row.get("Level", "Unknown")
-                language = student_row.get("Language", "Unknown")
+                language = student_row.get("Language Type", student_row.get("Language", "Unknown"))
                 grade = extract_grade_from_username(username)
                 old_group = student_row.get("Session Code", "Unknown")
                 old_group_time = student_row.get("Event Start Time", None)
-                old_group_day = student_row.get("Session Day", None)
+                old_group_day = student_row.get("Session Day", "Unknown")
                 physical_info = physical_sessions[physical_sessions["Username"] == username]
                 physical_group = physical_info["Session Code"].values[0] if not physical_info.empty else None
                 physical_group_time = physical_info["Event Start Date"].dt.time.values[0] if not physical_info.empty else None
@@ -88,7 +88,7 @@ if uploaded_file:
                     # Debugging output
                     st.write(f"Looking for groups on {day} at {time} for Level: {level}, Language: {language}, Grade: {grade}")
                     
-                    possible_groups = groups[
+                    filtered_groups = groups[
                         (groups["Level"].str.strip().str.lower() == level.strip().lower()) &
                         (groups["Language Type"].str.strip().str.lower() == language.strip().lower()) &
                         (groups["Grade"].str.contains(grade.split()[-1], na=False)) &
@@ -96,12 +96,12 @@ if uploaded_file:
                         (groups["Event Start Time"].notnull())
                     ]
                     
-                    st.write(f"Found {len(possible_groups)} possible groups before filtering.")
+                    st.write(f"Found {len(filtered_groups)} possible groups after filtering.")
                     
-                    for _, group in possible_groups.iterrows():
+                    for _, group in filtered_groups.iterrows():
                         session_code = group["Session Code"]
                         if session_code == old_group:
-                            continue  # ✅ 
+                            continue  # ✅ Skip same group
                         if session_code not in group_counts:
                             group_counts[session_code] = connect_sessions[connect_sessions["Session Code"] == session_code].shape[0]
                         if 15 < group_counts[session_code] < 35:
