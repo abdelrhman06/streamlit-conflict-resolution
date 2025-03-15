@@ -119,7 +119,7 @@ if uploaded_file:
                         conflict = False
                         if physical_group_time and new_group_time:
                             time_diff = abs((datetime.combine(datetime.today(), new_group_time) - datetime.combine(datetime.today(), physical_group_time)).total_seconds() / 3600)
-                            conflict = time_diff.total_seconds() / 3600 < 2.5
+                            conflict = time_diff < 2.5
                         else:
                             conflict = time_diff < 2.5
                         break
