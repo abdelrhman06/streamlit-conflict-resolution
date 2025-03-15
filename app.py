@@ -47,6 +47,16 @@ if uploaded_file:
     connect_sessions_l2["Day"] = connect_sessions_l2["Event Start Date"].dt.day_name()
     groups["Day"] = groups["Weekday"]
 
+    # دالة لتحويل الوقت مع التحقق من القيم
+    def parse_time(value):
+        if pd.notna(value):
+            value = str(value).strip()
+            try:
+                return datetime.strptime(value, "%H:%M:%S").time()
+            except ValueError:
+                return None  # لو لم يكن بتنسيق الوقت الصحيح، يتم إرجاع None
+        return None
+
     # استخراج المستوى واللغة والصف الدراسي
     def extract_session_info(session_code, username, df_groups):
         if isinstance(session_code, str):
@@ -82,19 +92,10 @@ if uploaded_file:
             username = row["Username"]
             requested_day = row["Requested Day"]
             
-            # تصحيح تحويل الوقت لمنع الأخطاء
-            requested_time = (
-                datetime.strptime(str(row["Requested Time"]), "%H:%M:%S").time()
-                if pd.notna(row["Requested Time"]) else None
-            )
-            alternative_time1 = (
-                datetime.strptime(str(row["Alternative Time 1"]), "%H:%M:%S").time()
-                if pd.notna(row["Alternative Time 1"]) else None
-            )
-            alternative_time2 = (
-                datetime.strptime(str(row["Alternative Time 2"]), "%H:%M:%S").time()
-                if pd.notna(row["Alternative Time 2"]) else None
-            )
+            # استخدام الدالة parse_time لضمان تحويل القيم بشكل صحيح
+            requested_time = parse_time(row["Requested Time"])
+            alternative_time1 = parse_time(row["Alternative Time 1"])
+            alternative_time2 = parse_time(row["Alternative Time 2"])
 
             student_info = connect_sessions[connect_sessions["Username"] == username]
 
