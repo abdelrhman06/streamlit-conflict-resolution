@@ -58,7 +58,7 @@ if uploaded_file:
         return None
 
     # إنشاء قاموس لتتبع عدد الطلاب في كل جروب
-    group_counts = {code: 5 for code in groups["Session Code"].unique()}  # يبدأ من 5
+    group_counts = {}
     
     # استخراج المستوى واللغة والصف الدراسي
     def extract_session_info(session_code, username, df_groups):
@@ -106,19 +106,17 @@ if uploaded_file:
                 old_group = student_row["Session Code"]
                 old_group_time = student_row["Event Start Date"].time()
                 
-                possible_groups = groups[
-                    (groups["Level"] == level) &
-                    (groups["Language Type"] == language) &
-                    (groups["Grade"] == grade) &
-                    (groups["Day"] == requested_day) &
-                    (groups["Session Code"] != old_group) &  # التأكد من أن الجروب الجديد ليس نفس القديم
-                    (groups["Session Code"].map(lambda x: 5 <= group_counts.get(x, 0) < 35))
-                ]
-                
-                if not possible_groups.empty:
-                    new_group = possible_groups.iloc[0]["Session Code"]
-                    new_group_time = possible_groups.iloc[0]["Event Start Time"]
-                    group_counts[new_group] += 1  # تحديث عدد الطلاب في الجروب
+                for _, group in groups.iterrows():
+                    session_code = group["Session Code"]
+                    if session_code == old_group:
+                        continue  # ✅ تجنب اختيار نفس الجروب القديم
+                    if session_code not in group_counts:
+                        group_counts[session_code] = connect_sessions[connect_sessions["Session Code"] == session_code].shape[0]
+                    if 15 < group_counts[session_code] < 35:
+                        group_counts[session_code] += 1
+                        new_group = session_code
+                        new_group_time = group["Event Start Time"]
+                        break
                 else:
                     new_group = "No Suitable Group"
                     new_group_time = None
