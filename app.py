@@ -27,7 +27,7 @@ if uploaded_file:
     session_requests_l1 = pd.read_excel(xls, sheet_name='Session Requests L1')
     session_requests_l2 = pd.read_excel(xls, sheet_name='Session Requests L2')
 
-    # 🧹 تنظيف أسماء الأعمدة
+    # 🧹 تنظيف أسماء الأعمدة وإزالة المسافات الزائدة
     groups.columns = groups.columns.str.strip()
     physical_sessions.columns = physical_sessions.columns.str.strip()
 
@@ -36,34 +36,52 @@ if uploaded_file:
     connect_sessions_l1["Event Start Date"] = pd.to_datetime(connect_sessions_l1["Event Start Date"], errors='coerce')
     connect_sessions_l2["Event Start Date"] = pd.to_datetime(connect_sessions_l2["Event Start Date"], errors='coerce')
 
-    # 🔹 دالة استخراج اليوم من Session Code
+    # 🔹 استخراج اليوم من `Session Code`
     def get_day_from_session_code(session_code):
         if isinstance(session_code, str):
-            if "F" in session_code:
-                return "Friday"
-            elif "S" in session_code:
-                return "Saturday"
-            elif "M" in session_code:
-                return "Monday"
-            elif "T" in session_code:
-                return "Tuesday"
-            elif "W" in session_code:
-                return "Wednesday"
-            elif "Th" in session_code:
-                return "Thursday"
-            elif "Su" in session_code:
-                return "Sunday"
+            if "F" in session_code: return "Friday"
+            if "S" in session_code: return "Saturday"
+            if "M" in session_code: return "Monday"
+            if "T" in session_code: return "Tuesday"
+            if "W" in session_code: return "Wednesday"
+            if "Th" in session_code: return "Thursday"
+            if "Su" in session_code: return "Sunday"
         return "Unknown"
 
     # 📌 استخراج اليوم من `Event Start Date` في `Physical Sessions`
     physical_sessions["Weekday"] = physical_sessions["Event Start Date"].dt.day_name()
 
-    # 📝 إضافة اليوم إلى جدول الجروبات
+    # 📝 إضافة اليوم إلى جدول `Groups`
     groups["Weekday"] = groups["Session Code"].astype(str).apply(get_day_from_session_code)
 
     # 📌 تطبيق استخراج اليوم في `Connect Sessions`
     for df in [connect_sessions_l1, connect_sessions_l2]:
         df["Weekday"] = df["Session Code"].astype(str).apply(get_day_from_session_code)
+
+    # 🔍 استخراج المستوى واللغة والصف من `Groups`
+    def extract_session_info(session_code, username, df_groups):
+        if isinstance(session_code, str):
+            group_info = df_groups[df_groups["Session Code"] == session_code]
+
+            if not group_info.empty:
+                level = group_info.iloc[0].get("Level", "Unknown")
+                language = group_info.iloc[0].get("Language Type", "Unknown")
+                grade = group_info.iloc[0].get("Grade", group_info.iloc[0].get("Grade ", "Unknown"))  # معالجة المسافة الزائدة
+            else:
+                level = "Level 2" if session_code[1].isdigit() else "Level 1"
+                language = "Arabic" if "A" in session_code else "English"
+                grade = None
+
+            if grade is None:
+                grade_match = re.search(r"G(\d+)", username)
+                grade = f"Grade {grade_match.group(1)}" if grade_match else "Unknown"
+
+            return level, language, grade
+        return "Unknown", "Unknown", "Unknown"
+
+    # تطبيق `extract_session_info()` على `Connect Sessions`
+    for df in [connect_sessions_l1, connect_sessions_l2]:
+        df[["Level", "Language", "Grade"]] = df.apply(lambda row: pd.Series(extract_session_info(row["Session Code"], row["Username"], groups)), axis=1)
 
     # 🔍 دالة لحساب فرق الساعات بين جلستين
     def time_difference(time1, time2):
@@ -81,25 +99,21 @@ if uploaded_file:
         session_requests = session_requests.copy()
         for _, row in session_requests.iterrows():
             username = row["Username"]
-            requested_day = row["Requested Day"]
-            requested_time = row["Requested Time"]
-            alternative_time1 = row["Alternative Time 1"]
-            alternative_time2 = row["Alternative Time 2"]
+            requested_day, requested_time = row["Requested Day"], row["Requested Time"]
+            alternative_time1, alternative_time2 = row["Alternative Time 1"], row["Alternative Time 2"]
 
             student_info = connect_sessions[connect_sessions["Username"] == username]
 
             if not student_info.empty:
                 student_row = student_info.iloc[0]
                 level, language, grade = student_row["Level"], student_row["Language"], student_row["Grade"]
-                old_group = student_row["Session Code"]
-                old_group_time = student_row["Event Start Date"].time()
-                old_group_day = student_row["Weekday"]
+                old_group, old_group_time, old_group_day = student_row["Session Code"], student_row["Event Start Date"].time(), student_row["Weekday"]
+
                 physical_info = physical_sessions[physical_sessions["Username"] == username]
                 physical_group = physical_info["Session Code"].values[0] if not physical_info.empty else None
                 physical_group_time = physical_info["Event Start Date"].dt.time.values[0] if not physical_info.empty else None
                 physical_group_day = physical_info["Weekday"].values[0] if not physical_info.empty else None
 
-                # 🏷️ البحث عن بديل مناسب مع التحقق من عدم التعارض
                 def find_alternative_group(day, time):
                     if day is None or time is None:
                         return None, None, None
@@ -112,41 +126,22 @@ if uploaded_file:
                         (groups["Event Start Time"] == time)
                     ]
                     for _, group in possible_groups.iterrows():
-                        session_code = group["Session Code"]
+                        session_code, new_group_time, new_group_day = group["Session Code"], group["Event Start Time"], group["Weekday"]
+
                         if session_code == old_group:
                             continue
+                        if physical_group_time and physical_group_day == new_group_day and time_difference(new_group_time, physical_group_time) < 2.5:
+                            continue  # ❌ يعتبر conflict
+
                         if session_code not in group_counts:
                             group_counts[session_code] = connect_sessions[connect_sessions["Session Code"] == session_code].shape[0]
+
                         if 15 < group_counts[session_code] < 35:
-                            new_group_time = group["Event Start Time"]
-                            new_group_day = group["Weekday"]
-
-                            # ✅ التحقق من التعارض
-                            if physical_group_time and physical_group_day:
-                                if new_group_day == physical_group_day and time_difference(new_group_time, physical_group_time) < 2.5:
-                                    continue  # ❌ يعتبر تعارض، يبحث عن مجموعة أخرى
-
                             group_counts[session_code] += 1
                             return session_code, new_group_time, group_counts[session_code]
                     return None, None, None
 
-                # 🔁 البحث عن جلسة جديدة مناسبة بدون تعارض
-                new_group, new_group_time, new_group_count = find_alternative_group(requested_day, requested_time)
-                if new_group is None:
-                    new_group, new_group_time, new_group_count = find_alternative_group(requested_day, alternative_time1)
-                if new_group is None:
-                    new_group, new_group_time, new_group_count = find_alternative_group(requested_day, alternative_time2)
-                if new_group is None:
-                    new_group, new_group_time, new_group_count = "No Suitable Group", None, None
-
-                session_requests.loc[session_requests["Username"] == username, [
-                    "New Group", "New Group Time", "New Group Student Count",
-                    "Old Group", "Old Group Time", "Physical Group", "Physical Group Time"
-                ]] = [
-                    new_group, new_group_time, new_group_count,
-                    old_group, old_group_time, physical_group, physical_group_time
-                ]
-                sheets[sheet_name] = pd.concat([sheets[sheet_name], session_requests[session_requests["Username"] == username]], ignore_index=True)
+                new_group, new_group_time, new_group_count = find_alternative_group(requested_day, requested_time) or find_alternative_group(requested_day, alternative_time1) or find_alternative_group(requested_day, alternative_time2) or ("No Suitable Group", None, None)
 
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
