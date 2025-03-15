@@ -57,6 +57,9 @@ if uploaded_file:
                 return None  # لو لم يكن بتنسيق الوقت الصحيح، يتم إرجاع None
         return None
 
+    # إنشاء قاموس لتتبع عدد الطلاب في كل جروب
+    group_counts = {code: 0 for code in groups["Session Code"].unique()}
+    
     # استخراج المستوى واللغة والصف الدراسي
     def extract_session_info(session_code, username, df_groups):
         if isinstance(session_code, str):
@@ -81,8 +84,7 @@ if uploaded_file:
 
     # إنشاء قائمة النتائج
     sheets = {"Session Requests L1": pd.DataFrame(), "Session Requests L2": pd.DataFrame()}
-    group_counts = {}
-
+    
     for session_requests, sheet_name, connect_sessions in zip(
         [session_requests_l1, session_requests_l2],
         ["Session Requests L1", "Session Requests L2"],
@@ -92,7 +94,6 @@ if uploaded_file:
             username = row["Username"]
             requested_day = row["Requested Day"]
             
-            # استخدام الدالة parse_time لضمان تحويل القيم بشكل صحيح
             requested_time = parse_time(row["Requested Time"])
             alternative_time1 = parse_time(row["Alternative Time 1"])
             alternative_time2 = parse_time(row["Alternative Time 2"])
@@ -109,15 +110,22 @@ if uploaded_file:
                     (groups["Level"] == level) &
                     (groups["Language Type"] == language) &
                     (groups["Grade"] == grade) &
-                    (groups["Day"] == requested_day)
+                    (groups["Day"] == requested_day) &
+                    (groups["Session Code"] != old_group)  # التأكد من أن الجروب الجديد ليس نفس القديم
                 ]
-
-                new_group = possible_groups.iloc[0]["Session Code"] if not possible_groups.empty else "No Suitable Group"
-                new_group_time = possible_groups.iloc[0]["Event Start Time"] if not possible_groups.empty else None
+                
+                possible_groups = possible_groups[possible_groups["Session Code"].map(lambda x: group_counts.get(x, 0)) < 35]
+                
+                if not possible_groups.empty:
+                    new_group = possible_groups.iloc[0]["Session Code"]
+                    new_group_time = possible_groups.iloc[0]["Event Start Time"]
+                    group_counts[new_group] += 1  # تحديث عدد الطلاب في الجروب
+                else:
+                    new_group = "No Suitable Group"
+                    new_group_time = None
 
                 session_requests.loc[session_requests["Username"] == username, [
-                    "New Group", "New Group Time",
-                    "Old Group", "Old Group Time"
+                    "New Group", "New Group Time", "Old Group", "Old Group Time"
                 ]] = [
                     new_group, new_group_time,
                     old_group, old_group_time
