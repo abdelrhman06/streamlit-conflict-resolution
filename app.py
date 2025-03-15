@@ -96,6 +96,7 @@ if uploaded_file:
                         if session_code == old_group:
                             continue  # ✅ 
                         if session_code not in group_counts:
+                            
                             group_counts[session_code] = connect_sessions[connect_sessions["Session Code"] == session_code].shape[0]
                         if 15 < group_counts[session_code] < 35:
                             new_group_time = group["Event Start Time"]
