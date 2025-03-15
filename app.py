@@ -99,6 +99,12 @@ if uploaded_file:
             alternative_time2 = parse_time(row["Alternative Time 2"])
 
             student_info = connect_sessions[connect_sessions["Username"] == username]
+            physical_info = physical_sessions[physical_sessions["Username"] == username]
+            
+            physical_group = physical_info["Session Code"].values[0] if not physical_info.empty else None
+            physical_group_time = physical_info["Event Start Date"].values[0] if not physical_info.empty else None
+            
+            conflict = False
 
             if not student_info.empty:
                 student_row = student_info.iloc[0]
@@ -116,17 +122,21 @@ if uploaded_file:
                         group_counts[session_code] += 1
                         new_group = session_code
                         new_group_time = group["Event Start Time"]
+                        conflict = (physical_group_time == new_group_time)  # ✅ التحقق من وجود تعارض في الوقت
                         break
                 else:
                     new_group = "No Suitable Group"
                     new_group_time = None
+                    conflict = False
 
                 session_requests.loc[session_requests["Username"] == username, [
-                    "New Group", "New Group Time", "Old Group", "Old Group Time", "New Group Count"
+                    "New Group", "New Group Time", "Old Group", "Old Group Time", "Physical Group", "Physical Group Time", "New Group Count", "Time Conflict"
                 ]] = [
                     new_group, new_group_time,
                     old_group, old_group_time,
-                    group_counts.get(new_group, 0)
+                    physical_group, physical_group_time,
+                    int(group_counts.get(new_group, 0)),
+                    conflict
                 ]
                 sheets[sheet_name] = pd.concat([sheets[sheet_name], session_requests[session_requests["Username"] == username]], ignore_index=True)
 
