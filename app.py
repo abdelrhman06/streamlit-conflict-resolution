@@ -4,9 +4,7 @@ import io
 import re
 
 # عنوان التطبيق
-st.title("📊 نظام حل تعارض الجلسات".encode("utf-8").decode("utf-8"))
-
-
+st.title("\ud83d\udcca نظام حل تعارض الجلسات")
 st.write("قم بتحميل ملف Excel الخاص بك للحصول على تقرير تعارض الجلسات.")
 
 # تحميل ملف Excel
@@ -28,10 +26,10 @@ if uploaded_file:
     physical_sessions.columns = physical_sessions.columns.str.strip()
     
     # تحويل التواريخ إلى datetime
-    physical_sessions["Event Date"] = pd.to_datetime(physical_sessions["Event Date"])
-    physical_sessions["Event Start Date"] = pd.to_datetime(physical_sessions["Event Start Date"])
-    connect_sessions_l1["Event Start Date"] = pd.to_datetime(connect_sessions_l1["Event Start Date"])
-    connect_sessions_l2["Event Start Date"] = pd.to_datetime(connect_sessions_l2["Event Start Date"])
+    physical_sessions["Event Date"] = pd.to_datetime(physical_sessions["Event Date"], errors='coerce')
+    physical_sessions["Event Start Date"] = pd.to_datetime(physical_sessions["Event Start Date"], errors='coerce')
+    connect_sessions_l1["Event Start Date"] = pd.to_datetime(connect_sessions_l1["Event Start Date"], errors='coerce')
+    connect_sessions_l2["Event Start Date"] = pd.to_datetime(connect_sessions_l2["Event Start Date"], errors='coerce')
     
     # استخراج اليوم من التواريخ
     physical_sessions["Day"] = physical_sessions["Event Date"].dt.day_name()
@@ -112,15 +110,15 @@ if uploaded_file:
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         for sheet_name, df in sheets.items():
-            df.to_excel(writer, sheet_name=sheet_name, index=False)
+            df.astype(str).to_excel(writer, sheet_name=sheet_name, index=False)
         writer.close()
-        processed_data = output.getvalue()
+    output.seek(0)
 
     # توفير زر لتحميل التقرير
     st.write("\u2705 تم معالجة البيانات بنجاح. انقر أدناه لتنزيل التقرير.")
     st.download_button(
         label="\ud83d\udcbe تنزيل التقرير",
-        data=processed_data,
-        file_name="session_requests_report.xlsx",
+        data=output,
+        file_name="session_report.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
