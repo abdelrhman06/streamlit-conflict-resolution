@@ -23,10 +23,16 @@ if uploaded_file:
     session_requests_l1 = pd.read_excel(xls, sheet_name='Session Requests L1')
     session_requests_l2 = pd.read_excel(xls, sheet_name='Session Requests L2')
 
+    # طباعة أسماء الأعمدة لمعرفة الأخطاء إن وجدت
+    print("Groups Columns:", groups.columns.tolist())
+
     # تنظيف أسماء الأعمدة
     groups.columns = groups.columns.str.strip()
     physical_sessions.columns = physical_sessions.columns.str.strip()
-    groups["Grade"] = groups["Grade "].str.strip()
+    
+    # البحث عن عمود Grade بشكل ديناميكي
+    grade_col = [col for col in groups.columns if "Grade" in col][0]  # يختار العمود الذي يحتوي على "Grade"
+    groups["Grade"] = groups[grade_col].str.strip()
     
     # تحويل التواريخ إلى datetime
     physical_sessions["Event Date"] = pd.to_datetime(physical_sessions["Event Date"], errors='coerce')
