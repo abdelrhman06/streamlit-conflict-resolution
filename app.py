@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import io
 import re
+from datetime import datetime
 
 st.title("📊 Finding Another Group for Students")
 st.write("""
@@ -13,13 +14,13 @@ Dedicated to **the Connect Team**.
 Part of **Almentor**.
 """)
 
-# تحميل ملف Excel
-uploaded_file = st.file_uploader("تحميل ملف Excel", type=["xlsx"])
+# Upload the Excel file
+uploaded_file = st.file_uploader("Upload Excel File", type=["xlsx"])
 
 if uploaded_file:
     xls = pd.ExcelFile(uploaded_file)
 
-    # تحميل بيانات الجداول
+    # Load data from sheets
     physical_sessions = pd.read_excel(xls, sheet_name='Physical Sessions')
     connect_sessions_l1 = pd.read_excel(xls, sheet_name='Connect Sessions L1')
     connect_sessions_l2 = pd.read_excel(xls, sheet_name='Connect Sessions L2')
@@ -27,15 +28,15 @@ if uploaded_file:
     session_requests_l1 = pd.read_excel(xls, sheet_name='Session Requests L1')
     session_requests_l2 = pd.read_excel(xls, sheet_name='Session Requests L2')
 
-    # تنظيف أسماء الأعمدة في جدول الجروبات
+    # Clean column names in groups table
     groups.columns = groups.columns.str.strip()
 
-    # تحويل تواريخ الجلسات إلى datetime
-    physical_sessions["Event Start Date"] = pd.to_datetime(physical_sessions["Event Start Date"])
-    connect_sessions_l1["Event Start Date"] = pd.to_datetime(connect_sessions_l1["Event Start Date"])
-    connect_sessions_l2["Event Start Date"] = pd.to_datetime(connect_sessions_l2["Event Start Date"])
+    # Convert event start dates to datetime
+    for df in [physical_sessions, connect_sessions_l1, connect_sessions_l2]:
+        df["Event Start Date"] = pd.to_datetime(df["Event Start Date"])
+        df["Weekday"] = df["Event Start Date"].dt.day_name()  # Extract actual weekday
 
-    # استخراج المستوى واللغة والصف الدراسي من Session Code أو من جدول الجروبات
+    # Extract level, language, and grade from session code
     def extract_session_info(session_code, username, df_groups):
         if isinstance(session_code, str):
             group_info = df_groups[df_groups["Session Code"] == session_code]
@@ -55,13 +56,12 @@ if uploaded_file:
             return level, language, grade
         return None, None, None
 
-    # تطبيق التحليل على الجروبات والمجموعات
     for df in [connect_sessions_l1, connect_sessions_l2]:
         df[["Level", "Language", "Grade"]] = df.apply(
             lambda row: pd.Series(extract_session_info(row["Session Code"], row["Username"], groups)), axis=1
         )
 
-    # إنشاء قائمة للنتائج لكل مجموعة
+    # Create results dictionary
     sheets = {"Session Requests L1": pd.DataFrame(), "Session Requests L2": pd.DataFrame()}
     group_counts = {}
 
@@ -84,6 +84,7 @@ if uploaded_file:
                 level, language, grade = student_row["Level"], student_row["Language"], student_row["Grade"]
                 old_group = student_row["Session Code"]
                 old_group_time = student_row["Event Start Date"].time()
+                old_group_day = student_row["Weekday"]
                 physical_info = physical_sessions[physical_sessions["Username"] == username]
                 physical_group = physical_info["Session Code"].values[0] if not physical_info.empty else None
                 physical_group_time = physical_info["Event Start Date"].dt.time.values[0] if not physical_info.empty else None
@@ -99,38 +100,39 @@ if uploaded_file:
                     for _, group in possible_groups.iterrows():
                         session_code = group["Session Code"]
                         if session_code == old_group:
-                            continue  # ✅ تجنب اختيار نفس الجروب القديم
+                            continue  # Avoid selecting the same old group
                         if session_code not in group_counts:
                             group_counts[session_code] = connect_sessions[connect_sessions["Session Code"] == session_code].shape[0]
                         if 15 < group_counts[session_code] < 35:
-                            group_counts[session_code] += 1
-                            return session_code, group["Event Start Time"], group_counts[session_code]
-                    return None, None, None
+                            if physical_group_time is None or abs(
+                                (pd.to_datetime(f"2024-01-01 {group['Event Start Time']}") - pd.to_datetime(f"2024-01-01 {physical_group_time}"))
+                                .total_seconds()) / 3600 >= 2.5:
+                                group_counts[session_code] += 1
+                                return session_code, group["Event Start Time"], group_counts[session_code], False
+                    return None, None, None, True
 
-                new_group, new_group_time, new_group_count = find_alternative_group(requested_day, requested_time)
+                new_group, new_group_time, new_group_count, conflict = find_alternative_group(requested_day, requested_time)
                 if new_group is None:
-                    new_group, new_group_time, new_group_count = find_alternative_group(requested_day, alternative_time1)
+                    new_group, new_group_time, new_group_count, conflict = find_alternative_group(requested_day, alternative_time1)
                 if new_group is None:
-                    new_group, new_group_time, new_group_count = find_alternative_group(requested_day, alternative_time2)
+                    new_group, new_group_time, new_group_count, conflict = find_alternative_group(requested_day, alternative_time2)
                 if new_group is None:
-                    new_group, new_group_time, new_group_count = "No Suitable Group", None, None
+                    new_group, new_group_time, new_group_count, conflict = "No Suitable Group", None, None, False
 
                 session_requests.loc[session_requests["Username"] == username, [
                     "New Group", "New Group Time", "New Group Student Count",
-                    "Old Group", "Old Group Time", "Physical Group", "Physical Group Time"
+                    "Old Group", "Old Group Time", "Physical Group", "Physical Group Time", "Conflict"
                 ]] = [
                     new_group, new_group_time, new_group_count,
-                    old_group, old_group_time, physical_group, physical_group_time
+                    old_group, old_group_time, physical_group, physical_group_time, conflict
                 ]
                 sheets[sheet_name] = pd.concat([sheets[sheet_name], session_requests[session_requests["Username"] == username]], ignore_index=True)
 
-    # حفظ النتائج في ملف Excel في الذاكرة
+    # Save the results
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         for sheet_name, df in sheets.items():
             df.to_excel(writer, sheet_name=sheet_name, index=False)
-        session_requests_l1.to_excel(writer, sheet_name="Session Requests L1", index=False)
-        session_requests_l2.to_excel(writer, sheet_name="Session Requests L2", index=False)
         writer.close()
         processed_data = output.getvalue()
 
@@ -140,4 +142,4 @@ if uploaded_file:
         data=processed_data,
         file_name="session_requests_report.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    ) 
+    )
