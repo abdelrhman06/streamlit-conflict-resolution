@@ -26,10 +26,6 @@ if uploaded_file:
     groups.columns = groups.columns.str.strip()
     physical_sessions.columns = physical_sessions.columns.str.strip()
 
-    # التأكد من وجود عمود "Day" في groups
-    if "Day" not in groups.columns:
-        groups["Day"] = groups["Weekday"]
-
     # تحويل تواريخ الجلسات إلى datetime
     physical_sessions["Event Date"] = pd.to_datetime(physical_sessions["Event Date"])
     physical_sessions["Event Start Date"] = pd.to_datetime(physical_sessions["Event Start Date"])
