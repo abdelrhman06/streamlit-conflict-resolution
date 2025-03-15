@@ -32,6 +32,10 @@ if uploaded_file:
     connect_sessions_l2["Event Start Date"] = pd.to_datetime(connect_sessions_l2["Event Start Date"], errors='coerce')
     groups["Event Start Time"] = pd.to_datetime(groups["Event Start Time"], format='%H:%M:%S', errors='coerce').dt.time
 
+    def extract_grade_from_username(username):
+        grade_match = re.search(r"G(\d+)", username)
+        return f"Grade {grade_match.group(1)}" if grade_match else "Unknown"
+
     def get_day_from_session_code(session_code):
         if isinstance(session_code, str):
             if "F" in session_code:
@@ -52,20 +56,22 @@ if uploaded_file:
         [connect_sessions_l1, connect_sessions_l2]
     ):
         for _, row in session_requests.iterrows():
-            username = row["Username"]
-            requested_day = row["Requested Day"]
-            requested_time = row["Requested Time"]
-            alternative_time1 = row["Alternative Time 1"]
-            alternative_time2 = row["Alternative Time 2"]
+            username = row.get("Username", "Unknown")
+            requested_day = row.get("Requested Day", None)
+            requested_time = row.get("Requested Time", None)
+            alternative_time1 = row.get("Alternative Time 1", None)
+            alternative_time2 = row.get("Alternative Time 2", None)
 
             student_info = connect_sessions[connect_sessions["Username"] == username]
 
             if not student_info.empty:
                 student_row = student_info.iloc[0]
-                level, language, grade = student_row["Level"], student_row["Language"], student_row["Grade"]
-                old_group = student_row["Session Code"]
-                old_group_time = student_row["Event Start Date"]
-                old_group_day = student_row["Session Day"]
+                level = student_row.get("Level", "Unknown")
+                language = student_row.get("Language", "Unknown")
+                grade = extract_grade_from_username(username)
+                old_group = student_row.get("Session Code", "Unknown")
+                old_group_time = student_row.get("Event Start Date", None)
+                old_group_day = student_row.get("Session Day", None)
                 physical_info = physical_sessions[physical_sessions["Username"] == username]
                 physical_group = physical_info["Session Code"].values[0] if not physical_info.empty else None
                 physical_group_time = physical_info["Event Start Date"].values[0] if not physical_info.empty else None
@@ -75,6 +81,8 @@ if uploaded_file:
                                 pd.Timestamp.combine(pd.Timestamp.today(), time2)).total_seconds() / 3600)
 
                 def find_alternative_group(day, time):
+                    if day is None or time is None:
+                        return None, None, None
                     possible_groups = groups[
                         (groups["Level"] == level) &
                         (groups["Language Type"] == language) &
