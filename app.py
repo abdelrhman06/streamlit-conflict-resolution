@@ -117,9 +117,9 @@ if uploaded_file:
                         new_group = session_code
                         new_group_time = group["Event Start Time"]
                         conflict = False
-                        if physical_group_time and new_group_time:
+                        if physical_group_time is not None and new_group_time is not None:
                             time_diff = abs((datetime.combine(datetime.today(), new_group_time) - datetime.combine(datetime.today(), physical_group_time)).total_seconds() / 3600)
-                            conflict = time_diff < 2.5
+                            conflict = time_diff is not None and time_diff < 2.5
                         else:
                             conflict = time_diff < 2.5
                         break
