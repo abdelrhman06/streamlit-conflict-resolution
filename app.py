@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import re
+import io
 from datetime import datetime, timedelta
 
 st.title("📊 Finding Another Group for Students")
@@ -71,3 +72,14 @@ if uploaded_file:
         return False
 
     st.success("✅ Data processed successfully!")
+    
+    # حفظ النتائج إلى ملف Excel
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        physical_sessions.to_excel(writer, sheet_name="Processed Physical Sessions", index=False)
+        connect_sessions_l1.to_excel(writer, sheet_name="Connect Sessions L1", index=False)
+        connect_sessions_l2.to_excel(writer, sheet_name="Connect Sessions L2", index=False)
+        writer.close()
+        processed_data = output.getvalue()
+
+    st.download_button("📥 Download Processed Data", processed_data, "processed_sessions.xlsx")
