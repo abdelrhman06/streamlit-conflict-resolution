@@ -90,8 +90,8 @@ if uploaded_file:
                             continue
                         if physical_group_time:
                             time_diff = abs(datetime.strptime(session_start_time, "%H:%M:%S").time() - physical_group_time)
-                            if time_diff < timedelta(hours=2, minutes=30):
-                                continue  # ✅ استبعاد الجروب لو التعارض أقل من ساعتين ونصف
+                            if time_diff <= timedelta(hours=2, minutes=30):
+                                continue  # ✅ استبعاد الجروب لو التعارض يساوي أو أقل من ساعتين ونصف
                         if session_code not in group_counts:
                             group_counts[session_code] = connect_sessions[connect_sessions["Session Code"] == session_code].shape[0]
                         if 15 < group_counts[session_code] < 35:
