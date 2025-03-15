@@ -46,6 +46,7 @@ if uploaded_file:
 
     for df in [connect_sessions_l1, connect_sessions_l2]:
         df["Session Day"] = df["Session Code"].apply(get_day_from_session_code)
+        df["Event Start Time"] = df["Event Start Date"].dt.time
 
     sheets = {"Session Requests L1": pd.DataFrame(), "Session Requests L2": pd.DataFrame()}
     group_counts = {}
@@ -70,11 +71,11 @@ if uploaded_file:
                 language = student_row.get("Language", "Unknown")
                 grade = extract_grade_from_username(username)
                 old_group = student_row.get("Session Code", "Unknown")
-                old_group_time = student_row.get("Event Start Date", None)
+                old_group_time = student_row.get("Event Start Time", None)
                 old_group_day = student_row.get("Session Day", None)
                 physical_info = physical_sessions[physical_sessions["Username"] == username]
                 physical_group = physical_info["Session Code"].values[0] if not physical_info.empty else None
-                physical_group_time = physical_info["Event Start Date"].values[0] if not physical_info.empty else None
+                physical_group_time = physical_info["Event Start Date"].dt.time.values[0] if not physical_info.empty else None
 
                 def time_difference(time1, time2):
                     return abs((pd.Timestamp.combine(pd.Timestamp.today(), time1) - 
