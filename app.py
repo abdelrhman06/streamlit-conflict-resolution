@@ -2,29 +2,34 @@ import streamlit as st
 import pandas as pd
 import io
 import re
-from datetime import datetime, timedelta
 
-st.title("\ud83d\udcca نظام حل تعارض الجلسات")
+# عنوان التطبيق
+st.title("📊 نظام حل تعارض الجلسات")
 st.write("قم بتحميل ملف Excel الخاص بك للحصول على تقرير تعارض الجلسات.")
 
+# تحميل ملف Excel
 uploaded_file = st.file_uploader("تحميل ملف Excel", type=["xlsx"])
 
 if uploaded_file:
     xls = pd.ExcelFile(uploaded_file)
-    
+
+    # تحميل بيانات الجداول
     physical_sessions = pd.read_excel(xls, sheet_name='Physical Sessions')
     connect_sessions_l1 = pd.read_excel(xls, sheet_name='Connect Sessions L1')
     connect_sessions_l2 = pd.read_excel(xls, sheet_name='Connect Sessions L2')
     groups = pd.read_excel(xls, sheet_name='Groups')
     session_requests_l1 = pd.read_excel(xls, sheet_name='Session Requests L1')
     session_requests_l2 = pd.read_excel(xls, sheet_name='Session Requests L2')
-    
+
+    # تنظيف أسماء الأعمدة في جدول الجروبات
     groups.columns = groups.columns.str.strip()
-    
+
+    # تحويل تواريخ الجلسات إلى datetime
     physical_sessions["Event Start Date"] = pd.to_datetime(physical_sessions["Event Start Date"])
     connect_sessions_l1["Event Start Date"] = pd.to_datetime(connect_sessions_l1["Event Start Date"])
     connect_sessions_l2["Event Start Date"] = pd.to_datetime(connect_sessions_l2["Event Start Date"])
-    
+
+    # استخراج المستوى واللغة والصف الدراسي من Session Code أو من جدول الجروبات
     def extract_session_info(session_code, username, df_groups):
         if isinstance(session_code, str):
             group_info = df_groups[df_groups["Session Code"] == session_code]
@@ -44,11 +49,13 @@ if uploaded_file:
             return level, language, grade
         return None, None, None
 
+    # تطبيق التحليل على الجروبات والمجموعات
     for df in [connect_sessions_l1, connect_sessions_l2]:
         df[["Level", "Language", "Grade"]] = df.apply(
             lambda row: pd.Series(extract_session_info(row["Session Code"], row["Username"], groups)), axis=1
         )
 
+    # إنشاء قائمة للنتائج لكل مجموعة
     sheets = {"Session Requests L1": pd.DataFrame(), "Session Requests L2": pd.DataFrame()}
     group_counts = {}
 
@@ -85,13 +92,8 @@ if uploaded_file:
                     ]
                     for _, group in possible_groups.iterrows():
                         session_code = group["Session Code"]
-                        session_start_time = group["Event Start Time"]
                         if session_code == old_group:
-                            continue
-                        if physical_group_time:
-                            time_diff = abs(datetime.strptime(session_start_time, "%H:%M:%S").time() - physical_group_time)
-                            if time_diff <= timedelta(hours=2, minutes=30):
-                                continue  # ✅ استبعاد الجروب لو التعارض يساوي أو أقل من ساعتين ونصف
+                            continue  # ✅ تجنب اختيار نفس الجروب القديم
                         if session_code not in group_counts:
                             group_counts[session_code] = connect_sessions[connect_sessions["Session Code"] == session_code].shape[0]
                         if 15 < group_counts[session_code] < 35:
@@ -116,16 +118,20 @@ if uploaded_file:
                 ]
                 sheets[sheet_name] = pd.concat([sheets[sheet_name], session_requests[session_requests["Username"] == username]], ignore_index=True)
 
+    # حفظ النتائج في ملف Excel في الذاكرة
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         for sheet_name, df in sheets.items():
             df.to_excel(writer, sheet_name=sheet_name, index=False)
+        session_requests_l1.to_excel(writer, sheet_name="Session Requests L1", index=False)
+        session_requests_l2.to_excel(writer, sheet_name="Session Requests L2", index=False)
         writer.close()
         processed_data = output.getvalue()
 
-    st.write("\u2705 تم معالجة البيانات بنجاح. انقر أدناه لتنزيل التقرير.")
+    # توفير زر لتحميل التقرير
+    st.write("✅ تم معالجة البيانات بنجاح. انقر أدناه لتنزيل التقرير.")
     st.download_button(
-        label="\ud83d\udcc5 تنزيل التقرير",
+        label="📥 تنزيل التقرير",
         data=processed_data,
         file_name="session_requests_report.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
