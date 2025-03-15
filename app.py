@@ -23,7 +23,6 @@ if uploaded_file:
 
     # تنظيف أسماء الأعمدة في جدول الجروبات
     groups.columns = groups.columns.str.strip()
-    physical_sessions.columns = physical_sessions.columns.str.strip()
 
     # تحويل تواريخ الجلسات إلى datetime
     physical_sessions["Event Date"] = pd.to_datetime(physical_sessions["Event Date"])
@@ -87,7 +86,7 @@ if uploaded_file:
                 old_group_time = student_row["Event Start Date"].time()
                 physical_info = physical_sessions[physical_sessions["Username"] == username]
                 physical_group = physical_info["Session Code"].values[0] if not physical_info.empty else None
-                physical_group_time = physical_info["Event Start Time"].values[0] if (not physical_info.empty and "Event Start Time" in physical_info.columns) else None
+                physical_group_time = physical_info["Event Start Time"].values[0] if not physical_info.empty else None
 
                 def find_alternative_group(day, time):
                     possible_groups = groups[
