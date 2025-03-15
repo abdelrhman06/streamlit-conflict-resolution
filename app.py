@@ -85,20 +85,15 @@ if uploaded_file:
                     if day is None or time is None:
                         return None, None, None
                     
-                    # Debugging output
-                    st.write(f"Looking for groups on {day} at {time} for Level: {level}, Language: {language}, Grade: {grade}")
-                    
-                    filtered_groups = groups[
+                    possible_groups = groups[
                         (groups["Level"].str.strip().str.lower() == level.strip().lower()) &
                         (groups["Language Type"].str.strip().str.lower() == language.strip().lower()) &
                         (groups["Grade"].str.contains(grade.split()[-1], na=False)) &
-                        (groups["Weekday"].str.strip().str.lower() == old_group_day.strip().lower()) &
+                        (groups["Weekday"].str.strip().str.lower() == day.strip().lower()) &
                         (groups["Event Start Time"].notnull())
                     ]
                     
-                    st.write(f"Found {len(filtered_groups)} possible groups after filtering.")
-                    
-                    for _, group in filtered_groups.iterrows():
+                    for _, group in possible_groups.iterrows():
                         session_code = group["Session Code"]
                         if session_code == old_group:
                             continue  # ✅ Skip same group
@@ -113,11 +108,11 @@ if uploaded_file:
                             return session_code, new_group_time, group_counts[session_code]
                     return None, None, None
 
-                new_group, new_group_time, new_group_count = find_alternative_group(old_group_day, requested_time)
+                new_group, new_group_time, new_group_count = find_alternative_group(requested_day, requested_time)
                 if new_group is None:
-                    new_group, new_group_time, new_group_count = find_alternative_group(old_group_day, alternative_time1)
+                    new_group, new_group_time, new_group_count = find_alternative_group(requested_day, alternative_time1)
                 if new_group is None:
-                    new_group, new_group_time, new_group_count = find_alternative_group(old_group_day, alternative_time2)
+                    new_group, new_group_time, new_group_count = find_alternative_group(requested_day, alternative_time2)
                 if new_group is None:
                     new_group, new_group_time, new_group_count = "No Suitable Group", None, None
 
