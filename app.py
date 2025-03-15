@@ -81,9 +81,20 @@ if uploaded_file:
         for _, row in session_requests.iterrows():
             username = row["Username"]
             requested_day = row["Requested Day"]
-            requested_time = datetime.strptime(row["Requested Time"], "%H:%M:%S").time()
-            alternative_time1 = datetime.strptime(row["Alternative Time 1"], "%H:%M:%S").time() if pd.notna(row["Alternative Time 1"]) else None
-            alternative_time2 = datetime.strptime(row["Alternative Time 2"], "%H:%M:%S").time() if pd.notna(row["Alternative Time 2"]) else None
+            
+            # تصحيح تحويل الوقت لمنع الأخطاء
+            requested_time = (
+                datetime.strptime(str(row["Requested Time"]), "%H:%M:%S").time()
+                if pd.notna(row["Requested Time"]) else None
+            )
+            alternative_time1 = (
+                datetime.strptime(str(row["Alternative Time 1"]), "%H:%M:%S").time()
+                if pd.notna(row["Alternative Time 1"]) else None
+            )
+            alternative_time2 = (
+                datetime.strptime(str(row["Alternative Time 2"]), "%H:%M:%S").time()
+                if pd.notna(row["Alternative Time 2"]) else None
+            )
 
             student_info = connect_sessions[connect_sessions["Username"] == username]
 
