@@ -84,13 +84,16 @@ if uploaded_file:
                 def find_alternative_group(day, time):
                     if day is None or time is None:
                         return None, None, None
+                    
+                    # تصحيح مقارنة الأيام
                     possible_groups = groups[
-                        (groups["Level"] == level) &
-                        (groups["Language Type"] == language) &
+                        (groups["Level"].str.strip().str.lower() == level.strip().lower()) &
+                        (groups["Language Type"].str.strip().str.lower() == language.strip().lower()) &
                         (groups["Grade"].str.contains(grade.split()[-1], na=False)) &
-                        (groups["Weekday"].str.strip().str.lower() == old_group_day.lower()) &
+                        (groups["Weekday"].str.strip().str.lower() == old_group_day.strip().lower()) &
                         (groups["Event Start Time"].notnull())
                     ]
+                    
                     for _, group in possible_groups.iterrows():
                         session_code = group["Session Code"]
                         if session_code == old_group:
