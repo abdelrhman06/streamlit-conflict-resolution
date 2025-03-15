@@ -25,9 +25,15 @@ if uploaded_file:
     groups.columns = groups.columns.str.strip()
 
     # تحويل تواريخ الجلسات إلى datetime
-    physical_sessions["Event Start Date"] = pd.to_datetime(physical_sessions["Event Start Date"])
+    physical_sessions["Event Date"] = pd.to_datetime(physical_sessions["Event Date"])
     connect_sessions_l1["Event Start Date"] = pd.to_datetime(connect_sessions_l1["Event Start Date"])
     connect_sessions_l2["Event Start Date"] = pd.to_datetime(connect_sessions_l2["Event Start Date"])
+
+    # استخراج اليوم من التواريخ
+    physical_sessions["Day"] = physical_sessions["Event Date"].dt.day_name()
+    connect_sessions_l1["Day"] = connect_sessions_l1["Event Start Date"].dt.day_name()
+    connect_sessions_l2["Day"] = connect_sessions_l2["Event Start Date"].dt.day_name()
+    groups["Day"] = groups["Weekday"]
 
     # استخراج المستوى واللغة والصف الدراسي من Session Code أو من جدول الجروبات
     def extract_session_info(session_code, username, df_groups):
@@ -80,14 +86,14 @@ if uploaded_file:
                 old_group_time = student_row["Event Start Date"].time()
                 physical_info = physical_sessions[physical_sessions["Username"] == username]
                 physical_group = physical_info["Session Code"].values[0] if not physical_info.empty else None
-                physical_group_time = physical_info["Event Start Date"].dt.time.values[0] if not physical_info.empty else None
+                physical_group_time = physical_info["Event Date"].dt.time.values[0] if not physical_info.empty else None
 
                 def find_alternative_group(day, time):
                     possible_groups = groups[
                         (groups["Level"] == level) &
                         (groups["Language Type"] == language) &
                         (groups["Grade"].str.contains(grade.split()[-1], na=False)) &
-                        (groups["Weekday"] == day) &
+                        (groups["Day"] == day) &
                         (groups["Event Start Time"] == time)
                     ]
                     for _, group in possible_groups.iterrows():
