@@ -4,7 +4,7 @@ import io
 import re
 
 # عنوان التطبيق
-st.title("📊 نظام حل تعارض الجلسات")
+st.title("\ud83d\udcca نظام حل تعارض الجلسات")
 st.write("قم بتحميل ملف Excel الخاص بك للحصول على تقرير تعارض الجلسات.")
 
 # تحميل ملف Excel
@@ -32,27 +32,21 @@ if uploaded_file:
     # استخراج اليوم من Session Code
     def extract_weekday_from_session_code(session_code):
         if isinstance(session_code, str):
-            if session_code.startswith("F"): return "Friday"
-            if session_code.startswith("S"): return "Saturday"
-            if session_code.startswith("M"): return "Monday"
-            if session_code.startswith("T"): return "Tuesday"
-            if session_code.startswith("W"): return "Wednesday"
-            if session_code.startswith("Th"): return "Thursday"
-            if session_code.startswith("Su"): return "Sunday"
+            mapping = {"F": "Friday", "S": "Saturday", "M": "Monday", "T": "Tuesday", 
+                       "W": "Wednesday", "Th": "Thursday", "Su": "Sunday"}
+            return mapping.get(session_code[:2], "Unknown")
         return "Unknown"
 
-    # إضافة عمود Weekday بناءً على Session Code في Physical Sessions
+    # تطبيق استخراج اليوم
     physical_sessions["Weekday"] = physical_sessions["Session Code"].apply(extract_weekday_from_session_code)
     physical_sessions["Weekday from Date"] = physical_sessions["Event Start Date"].dt.day_name()
 
-    # دالة التحقق من التعارض
+    # التحقق من التعارض
     def check_conflict(new_session_time, new_session_day, physical_session_time, physical_session_day):
         time_diff = abs((new_session_time - physical_session_time).total_seconds()) / 3600  # تحويل الفرق إلى ساعات
-        if new_session_day == physical_session_day and time_diff < 2.5:
-            return True  # يوجد تعارض
-        return False  # لا يوجد تعارض
+        return new_session_day == physical_session_day and time_diff < 2.5
 
-    # البحث عن التعارض بين الجلسات الـ Connect والجلسات الـ Physical
+    # البحث عن التعارضات
     conflicts = []
     for df in [connect_sessions_l1, connect_sessions_l2]:
         for _, row in df.iterrows():
@@ -61,7 +55,6 @@ if uploaded_file:
             new_session_day = new_session_time.day_name()
 
             physical_info = physical_sessions[physical_sessions["Username"] == username]
-
             if not physical_info.empty:
                 physical_session_time = physical_info["Event Start Date"].values[0]
                 physical_session_day = physical_info["Weekday from Date"].values[0]
@@ -72,17 +65,19 @@ if uploaded_file:
     # تحويل النتائج إلى DataFrame
     conflict_df = pd.DataFrame(conflicts, columns=["Username", "New Session Day", "New Session Time", "Physical Session Day", "Physical Session Time"])
 
-    # حفظ البيانات إلى ملف Excel
+    # حفظ النتائج في ملف Excel في الذاكرة
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        conflict_df.to_excel(writer, sheet_name="Conflicts", index=False)
+        for sheet_name, df in sheets.items():
+            df.to_excel(writer, sheet_name=sheet_name, index=False)
+        session_requests_l1.to_excel(writer, sheet_name="Session Requests L1", index=False)
+        session_requests_l2.to_excel(writer, sheet_name="Session Requests L2", index=False)
         writer.close()
         processed_data = output.getvalue()
-
     # عرض زر لتحميل التقرير
-    st.write("✅ تم معالجة البيانات بنجاح. انقر أدناه لتنزيل التقرير.")
+    st.write("\u2705 تم معالجة البيانات بنجاح. انقر أدناه لتنزيل التقرير.")
     st.download_button(
-        label="📥 تنزيل التقرير",
+        label="\ud83d\udcbd تنزيل التقرير",
         data=processed_data,
         file_name="session_conflicts_report.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
