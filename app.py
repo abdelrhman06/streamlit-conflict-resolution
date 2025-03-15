@@ -45,9 +45,14 @@ if uploaded_file:
     def extract_session_info(session_code, username, df_groups):
         if isinstance(session_code, str):
             group_info = df_groups[df_groups["Session Code"] == session_code]
-            level = group_info.iloc[0]["Level"] if not group_info.empty else "Level 1"
-            language = group_info.iloc[0].get("Language Type", "Arabic")
-            grade = group_info.iloc[0].get("Grade", None)
+            if not group_info.empty:
+                level = group_info.iloc[0]["Level"]
+                language = group_info.iloc[0].get("Language Type", "Arabic")
+                grade = group_info.iloc[0].get("Grade", None)
+            else:
+                level = "Level 1"
+                language = "Arabic"
+                grade = None
             
             if grade is None:
                 grade_match = re.search(r"G(\d+)", username)
