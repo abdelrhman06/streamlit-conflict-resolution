@@ -49,6 +49,7 @@ if uploaded_file:
         for _, row in session_requests.iterrows():
             username = row["Username"]
             requested_day = row["Requested Day"]
+            requested_day2 = row["Requested Day2"]
             requested_time = row["Requested Time"]
             alternative_time1 = row["Alternative Time 1"]
             alternative_time2 = row.get("Alternative Time 2", None)
@@ -81,7 +82,14 @@ if uploaded_file:
             if new_group is None:
                 new_group, new_group_time, new_group_count = find_alternative_group(requested_day, alternative_time1) or (None, None, None)
             if new_group is None:
-                new_group, new_group_time, new_group_count = find_alternative_group(requested_day, alternative_time2) or ("No Suitable Group", None, None)
+                new_group, new_group_time, new_group_count = find_alternative_group(requested_day, alternative_time2) or (None, None, None)
+            
+            if new_group is None:
+                new_group, new_group_time, new_group_count = find_alternative_group(requested_day2, requested_time) or (None, None, None)
+            if new_group is None:
+                new_group, new_group_time, new_group_count = find_alternative_group(requested_day2, alternative_time1) or (None, None, None)
+            if new_group is None:
+                new_group, new_group_time, new_group_count = find_alternative_group(requested_day2, alternative_time2) or ("No Suitable Group", None, None)
                 
             results.append({
                 "Username": username,
@@ -90,6 +98,7 @@ if uploaded_file:
                 "Physical Group": physical_group,
                 "Physical Group Time": physical_group_time,
                 "Requested Day": requested_day,
+                "Requested Day2": requested_day2,
                 "Requested Time": requested_time,
                 "New Group": new_group,
                 "New Group Time": new_group_time,
