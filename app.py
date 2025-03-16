@@ -14,6 +14,7 @@ Dedicated to **the Connect Team**.
 Part of **Almentor**.
 """)
 
+# Upload the Excel file
 uploaded_file = st.file_uploader("Upload Excel File", type=["xlsx"])
 
 if uploaded_file:
@@ -30,7 +31,7 @@ if uploaded_file:
     # Clean column names in groups table
     groups.columns = groups.columns.str.strip()
 
-    # Convert event start dates to datetime and extract correct weekday
+    # Convert event start dates to datetime
     for df in [physical_sessions, connect_sessions_l1, connect_sessions_l2]:
         df["Event Start Date"] = pd.to_datetime(df["Event Start Date"])
         df["Weekday"] = df["Event Start Date"].dt.day_name()  # Extract actual weekday
@@ -74,7 +75,7 @@ if uploaded_file:
             requested_day = row["Requested Day"]
             requested_time = row["Requested Time"]
             alternative_time1 = row["Alternative Time 1"]
-            alternative_time2 = row.get("Alternative Time 2", None)  # Handle missing values
+            alternative_time2 = row["Alternative Time 2"]
 
             student_info = connect_sessions[connect_sessions["Username"] == username]
 
@@ -111,20 +112,27 @@ if uploaded_file:
                     return None, None, None, True
 
                 new_group, new_group_time, new_group_count, conflict = find_alternative_group(requested_day, requested_time)
-                if new_group is None and alternative_time1:
+                if new_group is None:
                     new_group, new_group_time, new_group_count, conflict = find_alternative_group(requested_day, alternative_time1)
-                if new_group is None and alternative_time2:
+                if new_group is None:
                     new_group, new_group_time, new_group_count, conflict = find_alternative_group(requested_day, alternative_time2)
                 if new_group is None:
                     new_group, new_group_time, new_group_count, conflict = "No Suitable Group", None, None, False
 
-                session_requests.loc[_, "New Group"] = new_group
+                session_requests.loc[session_requests["Username"] == username, [
+                    "New Group", "New Group Time", "New Group Student Count",
+                    "Old Group", "Old Group Time", "Physical Group", "Physical Group Time", "Conflict"
+                ]] = [
+                    new_group, new_group_time, new_group_count,
+                    old_group, old_group_time, physical_group, physical_group_time, conflict
+                ]
+                sheets[sheet_name] = pd.concat([sheets[sheet_name], session_requests[session_requests["Username"] == username]], ignore_index=True)
 
-    # Save results
+    # Save the results
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        session_requests_l1.to_excel(writer, sheet_name="Session Requests L1", index=False)
-        session_requests_l2.to_excel(writer, sheet_name="Session Requests L2", index=False)
+        for sheet_name, df in sheets.items():
+            df.to_excel(writer, sheet_name=sheet_name, index=False)
         writer.close()
         processed_data = output.getvalue()
 
