@@ -95,11 +95,11 @@ if uploaded_file:
     
     # Process requests
     st.write("### Processing Session Requests L1...")
-    processed_l1 = process_requests(session_requests_l1, connect_sessions_l1)
+    processed_l1 = process_requests(session_requests_l1, connect_sessions_l1).astype(str)
     st.dataframe(processed_l1)
     
     st.write("### Processing Session Requests L2...")
-    processed_l2 = process_requests(session_requests_l2, connect_sessions_l2)
+    processed_l2 = process_requests(session_requests_l2, connect_sessions_l2).astype(str)
     st.dataframe(processed_l2)
     
     # Save results to Excel
