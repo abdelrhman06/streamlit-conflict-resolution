@@ -1,9 +1,9 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from datetime import datetime
 import io
-
+import re
+from datetime import datetime
 
 st.title("📊 Finding Another Group for Students")
 st.write("""
@@ -62,6 +62,8 @@ if uploaded_file:
             physical_group_time = physical_info["Event Start Time"].values[0] if not physical_info.empty else None
             
             def find_alternative_group(day, time):
+                if pd.isna(time):
+                    return None, None, None
                 possible_groups = groups[(groups["Weekday"] == day) & (groups["Event Start Time"] == time)]
                 for _, group in possible_groups.iterrows():
                     session_code = group["Session Code"]
@@ -76,9 +78,9 @@ if uploaded_file:
                 return None, None, None
             
             new_group, new_group_time, new_group_count = find_alternative_group(requested_day, requested_time) or (None, None, None)
-            if new_group is None and alternative_time1:
+            if new_group is None:
                 new_group, new_group_time, new_group_count = find_alternative_group(requested_day, alternative_time1) or (None, None, None)
-            if new_group is None and alternative_time2:
+            if new_group is None:
                 new_group, new_group_time, new_group_count = find_alternative_group(requested_day, alternative_time2) or ("No Suitable Group", None, None)
                 
             results.append({
