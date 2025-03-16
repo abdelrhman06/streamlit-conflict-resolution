@@ -48,8 +48,11 @@ if uploaded_file:
         
         for _, row in session_requests.iterrows():
             username = row["Username"]
-            requested_days = [row["Requested Day"], row["Requested Day2"]]
-            requested_times = [row["Requested Time"], row["Alternative Time 1"], row.get("Alternative Time 2", None)]
+            requested_day = row["Requested Day"]
+            requested_day2 = row["Requested Day2"]
+            requested_time = row["Requested Time"]
+            alternative_time1 = row["Alternative Time 1"]
+            alternative_time2 = row.get("Alternative Time 2", None)
             
             student_info = connect_sessions[connect_sessions["Username"] == username]
             old_group = student_info.iloc[0]["Session Code"] if not student_info.empty else None
@@ -75,17 +78,18 @@ if uploaded_file:
                             return session_code, group["Event Start Time"], group_counts[session_code]
                 return None, None, None
             
-            new_group, new_group_time, new_group_count = None, None, None
-            for day in requested_days:
-                for time in requested_times:
-                    new_group, new_group_time, new_group_count = find_alternative_group(day, time)
-                    if new_group:
-                        break
-                if new_group:
-                    break
+            new_group, new_group_time, new_group_count = find_alternative_group(requested_day, requested_time) or (None, None, None)
+            if new_group is None:
+                new_group, new_group_time, new_group_count = find_alternative_group(requested_day, alternative_time1) or (None, None, None)
+            if new_group is None:
+                new_group, new_group_time, new_group_count = find_alternative_group(requested_day, alternative_time2) or (None, None, None)
             
             if new_group is None:
-                new_group, new_group_time, new_group_count = "No Suitable Group", None, None
+                new_group, new_group_time, new_group_count = find_alternative_group(requested_day2, requested_time) or (None, None, None)
+            if new_group is None:
+                new_group, new_group_time, new_group_count = find_alternative_group(requested_day2, alternative_time1) or (None, None, None)
+            if new_group is None:
+                new_group, new_group_time, new_group_count = find_alternative_group(requested_day2, alternative_time2) or ("No Suitable Group", None, None)
                 
             results.append({
                 "Username": username,
@@ -93,8 +97,9 @@ if uploaded_file:
                 "Old Group Time": old_group_time,
                 "Physical Group": physical_group,
                 "Physical Group Time": physical_group_time,
-                "Requested Days": requested_days,
-                "Requested Times": requested_times,
+                "Requested Day": requested_day,
+                "Requested Day2": requested_day2,
+                "Requested Time": requested_time,
                 "New Group": new_group,
                 "New Group Time": new_group_time,
                 "New Group Student Count": new_group_count
