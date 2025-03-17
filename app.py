@@ -14,6 +14,8 @@ Dedicated to **the Connect Team**.
 Part of **Almentor**.
 """)
 
+
+
 # Upload file
 uploaded_file = st.file_uploader("Upload the Excel file", type=["xlsx"])
 
@@ -43,7 +45,7 @@ if uploaded_file:
     # Processing function
     def process_requests(session_requests, connect_sessions):
         results = []
-        group_counts = {}
+        group_counts = {session_code: connect_sessions[connect_sessions["Session Code"] == session_code].shape[0] for session_code in groups["Session Code"].unique()}
         group_details = []
         
         for _, row in session_requests.iterrows():
@@ -70,9 +72,7 @@ if uploaded_file:
                     session_code = group["Session Code"]
                     if session_code == old_group:
                         continue
-                    if session_code not in group_counts:
-                        group_counts[session_code] = connect_sessions[connect_sessions["Session Code"] == session_code].shape[0]
-                    if 15 < group_counts[session_code] < 35:
+                    if 15 < group_counts.get(session_code, 0) < 35:
                         if physical_group_time is None or abs((pd.to_datetime(f"2024-01-01 {str(group['Event Start Time'])}") - pd.to_datetime(f"2024-01-01 {str(physical_group_time)}")).total_seconds()) / 3600 >= 2.5:
                             group_counts[session_code] += 1
                             return session_code, group["Event Start Time"], group_counts[session_code]
@@ -104,27 +104,29 @@ if uploaded_file:
                 "New Group Time": new_group_time,
                 "New Group Student Count": new_group_count
             })
-            
+        
+        for session_code, count in group_counts.items():
+            initial_count = connect_sessions[connect_sessions["Session Code"] == session_code].shape[0]
             group_details.append({
-                "Session Code": new_group,
-                "Student Count After Assignment": group_counts.get(new_group, 0)
+                "Session Code": session_code,
+                "Initial Student Count": initial_count,
+                "Final Student Count": count,
+                "Change": count - initial_count
             })
         
         return pd.DataFrame(results), pd.DataFrame(group_details)
     
-    # Process requests
     processed_l1, group_details_l1 = process_requests(session_requests_l1, connect_sessions_l1)
     processed_l2, group_details_l2 = process_requests(session_requests_l2, connect_sessions_l2)
     
-    group_details = pd.concat([group_details_l1, group_details_l2])
-    
-    # Save results to Excels
     output_buffer = io.BytesIO()
     with pd.ExcelWriter(output_buffer, engine='xlsxwriter') as writer:
         processed_l1.to_excel(writer, sheet_name="Session Requests L1", index=False)
         processed_l2.to_excel(writer, sheet_name="Session Requests L2", index=False)
-        group_details.to_excel(writer, sheet_name="Group Details", index=False)
+        group_details_l1.to_excel(writer, sheet_name="Group Details", index=False)
+        group_details_l2.to_excel(writer, sheet_name="Group Details", index=False)
     output_buffer.seek(0)
+    
     
     # Download button
     st.download_button(
