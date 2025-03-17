@@ -31,14 +31,12 @@ if uploaded_file:
            df[column] = pd.to_datetime(df[column], errors='coerce').dt.time
        return df
    for df in [physical_sessions, session_requests_l1, session_requests_l2]:
-       df = convert_to_time(df, 'Requested Time')
-       df = convert_to_time(df, 'Alternative Time 1')
-       df = convert_to_time(df, 'Alternative Time 2')
+       for col in ['Requested Time', 'Alternative Time 1', 'Alternative Time 2']:
+           df = convert_to_time(df, col)
    # 🟢 **دالة البحث عن الجروب الجديد**
    def process_requests(session_requests, connect_sessions):
        results = []
        group_counts = connect_sessions['Session Code'].value_counts().to_dict()
-       group_details = []
        for _, row in session_requests.iterrows():
            username = row["Username"]
            requested_day = row["Requested Day"]
@@ -46,13 +44,10 @@ if uploaded_file:
            requested_times = [row["Requested Time"], row["Alternative Time 1"], row["Alternative Time 2"]]
            student_info = connect_sessions[connect_sessions["Username"] == username]
            old_group = student_info.iloc[0]["Session Code"] if not student_info.empty else None
-           if not student_info.empty and "Event Start Time" in student_info.columns:
-               old_group_time = student_info.iloc[0]["Event Start Time"]
-           else:
-               old_group_time = None
+           old_group_time = student_info.iloc[0]["Event Start Time"] if not student_info.empty and "Event Start Time" in student_info.columns else None
            physical_info = physical_sessions[physical_sessions["Username"] == username]
            physical_group = physical_info["Session Code"].values[0] if not physical_info.empty else None
-           physical_group_time = physical_info["Event Start Time"].values[0] if not physical_info.empty else None
+           physical_group_time = physical_info["Event Start Time"].values[0] if not physical_info.empty and "Event Start Time" in physical_info.columns else None
            new_group, new_group_time, new_group_count = None, None, None
            # 🟢 **البحث عن الجروب الجديد بطريقة منظمة**
            for day in [requested_day, requested_day2]:
