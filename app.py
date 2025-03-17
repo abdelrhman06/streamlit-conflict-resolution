@@ -14,8 +14,6 @@ Dedicated to **the Connect Team**.
 Part of **Almentor**.
 """)
 
-
-
 # Upload file
 uploaded_file = st.file_uploader("Upload the Excel file", type=["xlsx"])
 
@@ -123,14 +121,11 @@ if uploaded_file:
     with pd.ExcelWriter(output_buffer, engine='xlsxwriter') as writer:
         processed_l1.to_excel(writer, sheet_name="Session Requests L1", index=False)
         processed_l2.to_excel(writer, sheet_name="Session Requests L2", index=False)
-        group_details_l1.to_excel(writer, sheet_name="Group Details", index=False)
-        group_details_l2.to_excel(writer, sheet_name="Group Details", index=False)
+        pd.concat([group_details_l1, group_details_l2]).to_excel(writer, sheet_name="Group Details", index=False)
     output_buffer.seek(0)
     
-    
-    # Download button
     st.download_button(
-        label="📥 Download Processed Data",
+        label="💾 Download Processed Data",
         data=output_buffer,
         file_name="session_requests_fixed.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
