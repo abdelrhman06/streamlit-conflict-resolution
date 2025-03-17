@@ -27,12 +27,16 @@ if uploaded_file:
    connect_sessions = pd.concat([connect_sessions_l1, connect_sessions_l2])
    # ✅ **تحويل التوقيتات إلى `time` فقط**
    def convert_to_time(df, column):
+       """تحويل القيم الزمنية إلى `time` فقط والتأكد من عدم وجود `None`"""
        if column in df.columns:
-           df[column] = pd.to_datetime(df[column], errors='coerce').dt.time
+           df[column] = pd.to_datetime(df[column], format="%I:%M %p", errors='coerce').dt.time
        return df
-   for df in [physical_sessions, session_requests_l1, session_requests_l2]:
+   for df in [session_requests_l1, session_requests_l2]:
        for col in ['Requested Time', 'Alternative Time 1', 'Alternative Time 2']:
            df = convert_to_time(df, col)
+   # **تحويل `Event Start Time` في Physical و Connect Sessions**
+   for df in [physical_sessions, connect_sessions]:
+       df = convert_to_time(df, "Event Start Time")
    # 🟢 **دالة البحث عن الجروب الجديد**
    def process_requests(session_requests, connect_sessions):
        results = []
