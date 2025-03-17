@@ -129,9 +129,20 @@ if uploaded_file:
     st.write("### Group Details")
     st.dataframe(pd.concat([group_details_l1, group_details_l2]))
 
-    st.download_button(
-        label="💾 Download Processed Data",
-        data=io.BytesIO(),
-        file_name="session_requests_fixed.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
+   # Save results to a properly formatted Excel file
+output_buffer = io.BytesIO()
+with pd.ExcelWriter(output_buffer, engine='xlsxwriter') as writer:
+    processed_l1.to_excel(writer, sheet_name="Session Requests L1", index=False)
+    processed_l2.to_excel(writer, sheet_name="Session Requests L2", index=False)
+    pd.concat([group_details_l1, group_details_l2]).to_excel(writer, sheet_name="Group Details", index=False)
+    
+    writer.close()  # تأكد من إغلاق الـ writer لحفظ الملف بشكل صحيح
+output_buffer.seek(0)
+
+# Add download button
+st.download_button(
+    label="💾 Download Processed Data",
+    data=output_buffer,
+    file_name="session_requests_fixed.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+)
