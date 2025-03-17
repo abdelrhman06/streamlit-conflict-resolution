@@ -70,7 +70,7 @@ if uploaded_file:
                     if session_code == old_group:
                         continue
                     if 15 < group_counts.get(session_code, 0) < 35:
-                        if physical_group_time is None or abs((datetime.combine(datetime.today(), group["Event Start Time"]) - datetime.combine(datetime.today(), physical_group_time)).total_seconds()) / 3600 >= 2.5:
+                        if physical_group_time is None or abs((datetime.combine(datetime.today(), group["Event Start Time"]) - datetime.combine(datetime.today(), physical_group_time)).total_seconds()) / 3600 > 1:
                             group_counts[session_code] += 1
                             return session_code, group["Event Start Time"], group_counts[session_code]
                 return None, None, None
