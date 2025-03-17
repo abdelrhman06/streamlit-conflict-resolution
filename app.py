@@ -10,74 +10,73 @@ This application was developed by **Abdelrahman Salah**.
 Dedicated to **the Connect Team**.  
 Part of **Almentor**.
 """)
-# 📂 **رفع ملف الإكسل**
+# 📂 **تحميل ملف الإكسل**
 uploaded_file = st.file_uploader("Upload the Excel file", type=["xlsx"])
 if uploaded_file:
    xls = pd.ExcelFile(uploaded_file)
-   # 🟢 **تحميل البيانات**
+   # 📌 **تحميل الجداول من الملف**
    physical_sessions = pd.read_excel(xls, sheet_name='Physical Sessions')
    connect_sessions_l1 = pd.read_excel(xls, sheet_name='Connect Sessions L1')
    connect_sessions_l2 = pd.read_excel(xls, sheet_name='Connect Sessions L2')
    session_requests_l1 = pd.read_excel(xls, sheet_name='Session Requests L1')
    session_requests_l2 = pd.read_excel(xls, sheet_name='Session Requests L2')
-   # ✅ **تنظيف أسماء الأعمدة من أي فراغات زائدة**
-   for df in [physical_sessions, connect_sessions_l1, connect_sessions_l2, session_requests_l1, session_requests_l2]:
-       df.columns = df.columns.str.strip()
-   # 🟢 **استخراج بيانات الجروبات من Connect Sessions**
-   connect_sessions = pd.concat([connect_sessions_l1, connect_sessions_l2])
-   # ✅ **تحويل التوقيتات إلى `time` فقط**
-   def convert_to_time(df, column):
-       """تحويل القيم الزمنية إلى `time` فقط والتأكد من عدم وجود `None`"""
-       if column in df.columns:
-           df[column] = pd.to_datetime(df[column], format="%I:%M %p", errors='coerce').dt.time
-       return df
-   for df in [session_requests_l1, session_requests_l2]:
-       for col in ['Requested Time', 'Alternative Time 1', 'Alternative Time 2']:
-           df = convert_to_time(df, col)
-   # **تحويل `Event Start Time` في Physical و Connect Sessions**
-   for df in [physical_sessions, connect_sessions]:
-       df = convert_to_time(df, "Event Start Date")
-   # 🟢 **دالة البحث عن الجروب الجديد**
+   # **إنشاء جدول الجروبات من Connect بدلاً من Groups**
+   groups = pd.concat([connect_sessions_l1, connect_sessions_l2], ignore_index=True)
+   groups = groups[['Session Code', 'Event Start Date']].drop_duplicates()
+   groups['Event Start Time'] = pd.to_datetime(groups['Event Start Date']).dt.time
+   groups['Weekday'] = pd.to_datetime(groups['Event Start Date']).dt.day_name()
+   # 🔄 **تحويل الأعمدة الزمنية إلى الوقت فقط**
+   for df in [physical_sessions, connect_sessions_l1, connect_sessions_l2]:
+       df["Event Start Date"] = pd.to_datetime(df["Event Start Date"])
+       df["Weekday"] = df["Event Start Date"].dt.day_name()
+       df["Event Start Time"] = df["Event Start Date"].dt.time
+   # 🛠️ **معالجة طلبات تغيير الجروبات**
    def process_requests(session_requests, connect_sessions):
        results = []
-       group_counts = connect_sessions['Session Code'].value_counts().to_dict()
+       group_counts = {session_code: connect_sessions[connect_sessions["Session Code"] == session_code].shape[0] for session_code in groups["Session Code"].unique()}
+       group_details = []
        for _, row in session_requests.iterrows():
            username = row["Username"]
            requested_day = row["Requested Day"]
            requested_day2 = row["Requested Day2"]
-           requested_times = [row["Requested Time"], row["Alternative Time 1"], row["Alternative Time 2"]]
+           requested_time = row["Requested Time"]
+           alternative_time1 = row["Alternative Time 1"]
+           alternative_time2 = row.get("Alternative Time 2", None)
            student_info = connect_sessions[connect_sessions["Username"] == username]
            old_group = student_info.iloc[0]["Session Code"] if not student_info.empty else None
-           old_group_time = student_info.iloc[0]["Event Start Time"] if not student_info.empty and "Event Start Time" in student_info.columns else None
+           old_group_time = student_info.iloc[0]["Event Start Time"] if not student_info.empty else None
            physical_info = physical_sessions[physical_sessions["Username"] == username]
            physical_group = physical_info["Session Code"].values[0] if not physical_info.empty else None
-           physical_group_time = physical_info["Event Start Time"].values[0] if not physical_info.empty and "Event Start Time" in physical_info.columns else None
-           new_group, new_group_time, new_group_count = None, None, None
-           # 🟢 **البحث عن الجروب الجديد بطريقة منظمة**
-           for day in [requested_day, requested_day2]:
-               for time_option in requested_times:
-                   if pd.isna(time_option):
+           physical_group_time = physical_info["Event Start Time"].values[0] if not physical_info.empty else None
+           # ✅ **البحث عن جروب بديل**
+           def find_alternative_group(day, time):
+               if pd.isna(time):
+                   return None, None, None
+               possible_groups = groups[(groups["Weekday"] == day) & (groups["Event Start Time"] == time)]
+               for _, group in possible_groups.iterrows():
+                   session_code = group["Session Code"]
+                   if session_code == old_group:
                        continue
-                   possible_groups = connect_sessions[
-                       (connect_sessions["Weekday"] == day) &
-                       (connect_sessions["Event Start Time"] == time_option)
-                   ]
-                   for _, group in possible_groups.iterrows():
-                       session_code = group["Session Code"]
-                       if session_code == old_group:
-                           continue
-                       if group_counts.get(session_code, 0) < 35:
-                           if physical_group_time is None or abs(
-                                   (datetime.combine(datetime.today(), group["Event Start Time"]) - datetime.combine(datetime.today(), physical_group_time)).total_seconds()) / 3600 >= 2.5:
-                               group_counts[session_code] = group_counts.get(session_code, 0) + 1
-                               new_group, new_group_time, new_group_count = session_code, group["Event Start Time"], group_counts[session_code]
-                               break
-                   if new_group:
-                       break
-               if new_group:
-                   break
+                   if 15 < group_counts.get(session_code, 0) < 35:
+                       if physical_group_time is None or abs((datetime.combine(datetime.today(), group["Event Start Time"]) - datetime.combine(datetime.today(), physical_group_time)).total_seconds()) / 3600 >= 2.5:
+                           group_counts[session_code] += 1
+                           return session_code, group["Event Start Time"], group_counts[session_code]
+               return None, None, None
+           # 🔄 **تنفيذ البحث عن الجروب الجديد بالترتيب**
+           new_group, new_group_time, new_group_count = find_alternative_group(requested_day, requested_time) or (None, None, None)
            if new_group is None:
-               new_group, new_group_time, new_group_count = "No Suitable Group", None, None
+               new_group, new_group_time, new_group_count = find_alternative_group(requested_day, alternative_time1) or (None, None, None)
+           if new_group is None:
+               new_group, new_group_time, new_group_count = find_alternative_group(requested_day, alternative_time2) or (None, None, None)
+           if new_group is None:
+               new_group, new_group_time, new_group_count = find_alternative_group(requested_day2, requested_time) or (None, None, None)
+           if new_group is None:
+               new_group, new_group_time, new_group_count = find_alternative_group(requested_day2, alternative_time1) or (None, None, None)
+           if new_group is None:
+               new_group, new_group_time, new_group_count = find_alternative_group(requested_day2, alternative_time2) or ("No Suitable Group", None, None)
+           # 🛠️ **تحديث عدد الطلاب في الجروب القديم**
+           if new_group != "No Suitable Group" and old_group in group_counts:
+               group_counts[old_group] -= 1
            results.append({
                "Username": username,
                "Old Group": old_group,
@@ -86,29 +85,35 @@ if uploaded_file:
                "Physical Group Time": physical_group_time,
                "Requested Day": requested_day,
                "Requested Day2": requested_day2,
-               "Requested Time": row["Requested Time"],
-               "Alternative Time 1": row["Alternative Time 1"],
-               "Alternative Time 2": row["Alternative Time 2"],
+               "Requested Time": requested_time,
                "New Group": new_group,
                "New Group Time": new_group_time,
                "New Group Student Count": new_group_count
            })
-       return pd.DataFrame(results)
-   # 🟢 **تنفيذ البحث عن الجروبات**
-   processed_l1 = process_requests(session_requests_l1, connect_sessions_l1)
-   processed_l2 = process_requests(session_requests_l2, connect_sessions_l2)
-   # 🟢 **عرض النتائج في Streamlit**
-   st.write("### Processed Session Requests L1")
-   st.dataframe(processed_l1)
-   st.write("### Processed Session Requests L2")
-   st.dataframe(processed_l2)
-   # 🟢 **حفظ البيانات في إكسل**
+       # 📌 **إضافة تفاصيل الجروبات النهائية**
+       for session_code in groups["Session Code"].unique():
+           initial_count = connect_sessions[connect_sessions["Session Code"] == session_code].shape[0]
+           final_count = group_counts.get(session_code, initial_count)
+           group_time = groups.loc[groups["Session Code"] == session_code, "Event Start Time"].values[0] if session_code in groups["Session Code"].values else None
+           group_details.append({
+               "Session Code": session_code,
+               "Event Start Time": group_time,
+               "Initial Student Count": initial_count,
+               "Final Student Count": final_count,
+               "Change": final_count - initial_count
+           })
+       return pd.DataFrame(results), pd.DataFrame(group_details)
+   # 📝 **تنفيذ العملية على البيانات**
+   processed_l1, group_details_l1 = process_requests(session_requests_l1, connect_sessions_l1)
+   processed_l2, group_details_l2 = process_requests(session_requests_l2, connect_sessions_l2)
+   # **حفظ البيانات النهائية في ملف Excel**
    output_buffer = io.BytesIO()
    with pd.ExcelWriter(output_buffer, engine='xlsxwriter') as writer:
        processed_l1.to_excel(writer, sheet_name="Session Requests L1", index=False)
        processed_l2.to_excel(writer, sheet_name="Session Requests L2", index=False)
+       pd.concat([group_details_l1, group_details_l2]).to_excel(writer, sheet_name="Group Details", index=False)
    output_buffer.seek(0)
-   # 🟢 **زر لتحميل البيانات**
+   # 📥 **إضافة زر تحميل الملف**
    st.download_button(
        label="💾 Download Processed Data",
        data=output_buffer,
