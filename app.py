@@ -104,6 +104,11 @@ if uploaded_file:
                 "New Group Time": new_group_time,
                 "New Group Student Count": new_group_count
             })
+            
+            group_details.append({
+                "Session Code": new_group,
+                "Student Count After Assignment": group_counts.get(new_group, 0)
+            })
         
         return pd.DataFrame(results), pd.DataFrame(group_details)
     
@@ -111,13 +116,14 @@ if uploaded_file:
     processed_l1, group_details_l1 = process_requests(session_requests_l1, connect_sessions_l1)
     processed_l2, group_details_l2 = process_requests(session_requests_l2, connect_sessions_l2)
     
-    # Save results to Excel
+    group_details = pd.concat([group_details_l1, group_details_l2])
+    
+    # Save results to Excels
     output_buffer = io.BytesIO()
     with pd.ExcelWriter(output_buffer, engine='xlsxwriter') as writer:
         processed_l1.to_excel(writer, sheet_name="Session Requests L1", index=False)
         processed_l2.to_excel(writer, sheet_name="Session Requests L2", index=False)
-        group_details_l1.to_excel(writer, sheet_name="Group Details", index=False)
-        group_details_l2.to_excel(writer, sheet_name="Group Details", index=False)
+        group_details.to_excel(writer, sheet_name="Group Details", index=False)
     output_buffer.seek(0)
     
     # Download button
