@@ -89,25 +89,28 @@ if uploaded_file:
                "New Group Time": new_group_time,
                "New Group Student Count": new_group_count
            })
-       for session_code, count in group_counts.items():
-           initial_count = connect_sessions[connect_sessions["Session Code"] == session_code].shape[0]
-           group_details.append({
+       group_details_df = pd.DataFrame([
+           {
                "Session Code": session_code,
                "Event Start Time": groups.loc[groups["Session Code"] == session_code, "Event Start Time"].values[0] if session_code in groups["Session Code"].values else None,
-               "Initial Student Count": initial_count,
-               "Final Student Count": count,
-               "Change": count - initial_count
-           })
-       return pd.DataFrame(results), pd.DataFrame(group_details)
+               "Initial Student Count": connect_sessions[connect_sessions["Session Code"] == session_code].shape[0],
+               "Final Student Count": group_counts.get(session_code, connect_sessions[connect_sessions["Session Code"] == session_code].shape[0]),
+               "Change": group_counts.get(session_code, connect_sessions[connect_sessions["Session Code"] == session_code].shape[0]) - connect_sessions[connect_sessions["Session Code"] == session_code].shape[0]
+           }
+           for session_code in set(groups["Session Code"])
+       ])
+       return pd.DataFrame(results), group_details_df
    processed_l1, group_details_l1 = process_requests(session_requests_l1, connect_sessions_l1)
    processed_l2, group_details_l2 = process_requests(session_requests_l2, connect_sessions_l2)
+   # دمج البيانات بحيث يكون كل جروب ظاهر مرة واحدة فقط
+   final_group_details = pd.concat([group_details_l1, group_details_l2]).drop_duplicates(subset=["Session Code"])
    st.write("### Group Details")
-   st.dataframe(pd.concat([group_details_l1, group_details_l2]))
+   st.dataframe(final_group_details)
    output_buffer = io.BytesIO()
    with pd.ExcelWriter(output_buffer, engine='xlsxwriter') as writer:
        processed_l1.to_excel(writer, sheet_name="Session Requests L1", index=False)
        processed_l2.to_excel(writer, sheet_name="Session Requests L2", index=False)
-       pd.concat([group_details_l1, group_details_l2]).to_excel(writer, sheet_name="Group Details", index=False)
+       final_group_details.to_excel(writer, sheet_name="Group Details", index=False)
    output_buffer.seek(0)
    st.download_button(
        label="💾 Download Processed Data",
