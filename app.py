@@ -71,7 +71,7 @@ if uploaded_file:
                     if session_code == old_group:
                         continue
                     if 15 < group_counts.get(session_code, 0) < 35:
-                        if physical_group_time is None or abs((pd.to_datetime(f"2024-01-01 {str(group['Event Start Time'])}") - pd.to_datetime(f"2024-01-01 {str(physical_group_time)}")).total_seconds()) / 3600 >= 2.5:
+                        if physical_group_time is None or abs((pd.to_datetime(f"2024-01-01 {str(group['Event Start Time'])}") - pd.to_datetime(f"2024-01-01 {str(physical_group_time)}")).total_seconds()) / 3600 > 2.5:
                             group_counts[session_code] += 1
                             return session_code, group["Event Start Time"], group_counts[session_code]
                 return None, None, None
