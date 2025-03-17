@@ -36,7 +36,7 @@ if uploaded_file:
            df = convert_to_time(df, col)
    # **تحويل `Event Start Time` في Physical و Connect Sessions**
    for df in [physical_sessions, connect_sessions]:
-       df = convert_to_time(df, "Event Start Time")
+       df = convert_to_time(df, "Event Start Date")
    # 🟢 **دالة البحث عن الجروب الجديد**
    def process_requests(session_requests, connect_sessions):
        results = []
