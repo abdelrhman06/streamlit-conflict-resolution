@@ -35,8 +35,7 @@ if uploaded_file:
     for df in [physical_sessions, connect_sessions_l1, connect_sessions_l2]:
         df["Event Start Date"] = pd.to_datetime(df["Event Start Date"])
         df["Weekday"] = df["Event Start Date"].dt.day_name()
-        df["Event Start Time"] = df["Event Start Date"].dt.strftime("%H:%M:%S")
-        df["Event Start Time"] = pd.to_datetime(df["Event Start Time"], format="%H:%M:%S", errors="coerce").dt.time
+        df["Event Start Time"] = pd.to_datetime(df["Event Start Date"].dt.strftime("%H:%M:%S"), format="%H:%M:%S").dt.time
 
     groups["Event Start Time"] = pd.to_datetime(groups["Event Start Time"], format="%I:%M %p", errors="coerce").dt.time
     
@@ -123,13 +122,15 @@ if uploaded_file:
     st.write("### Group Details")
     st.dataframe(pd.concat([group_details_l1, group_details_l2]))
     
+    # Ensure output_buffer is initialized and contains the data before calling download_button
     output_buffer = io.BytesIO()
     with pd.ExcelWriter(output_buffer, engine='xlsxwriter') as writer:
         processed_l1.to_excel(writer, sheet_name="Session Requests L1", index=False)
         processed_l2.to_excel(writer, sheet_name="Session Requests L2", index=False)
         pd.concat([group_details_l1, group_details_l2]).to_excel(writer, sheet_name="Group Details", index=False)
-    output_buffer.seek(0)
     
+    output_buffer.seek(0)  # Move pointer to start of the buffer
+
     st.download_button(
         label="💾 Download Processed Data",
         data=output_buffer,
