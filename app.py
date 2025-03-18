@@ -25,20 +25,6 @@ Part of **Almentor**.
 """)
 
 
-
-import streamlit as st
-import pandas as pd
-import numpy as np
-import io
-from datetime import datetime
-st.title("\ud83d\udcca Finding Another Group for Students")
-st.write("""
-Enter the day and time the student wants to find a new group that suits them.  
-This application was developed by **Abdelrahman Salah**.  
-Dedicated to **the Connect Team**.  
-Part of **Almentor**.
-""")
-
 uploaded_file = st.file_uploader("Upload the Excel file", type=["xlsx"])
 if uploaded_file:
    xls = pd.ExcelFile(uploaded_file)
