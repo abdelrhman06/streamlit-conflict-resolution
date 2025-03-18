@@ -5,9 +5,9 @@ import io
 from datetime import datetime
 st.title("📊 Finding Another Group for Students")
 st.write("""
-Enter the day and time the student wants to find a new group that suits them.  
-This application was developed by **Abdelrahman Salah**.  
-Dedicated to **the Connect Team**.  
+Enter the day and time the student wants to find a new group that suits them.
+This application was developed by **Abdelrahman Salah**.
+Dedicated to **the Connect Team**.
 Part of **Almentor**.
 """)
 
@@ -26,7 +26,7 @@ if uploaded_file:
 
    for df in [physical_sessions, connect_sessions_l1, connect_sessions_l2]:
        df["Event Start Date"] = pd.to_datetime(df["Event Start Date"])
-       df["Weekday"] = df["Event Start Date"].dt.day_name()
+       df["Weekday"] = df["Event Start Date"].dt.day_name()  
        df["Event Start Time"] = df["Event Start Date"].dt.strftime("%H:%M:%S")
        df["Event Start Time"] = pd.to_datetime(df["Event Start Time"], format="%H:%M:%S", errors="coerce").dt.time
    groups["Event Start Time"] = pd.to_datetime(groups["Event Start Time"], format="%H:%M:%S", errors="coerce").dt.time
@@ -48,6 +48,7 @@ if uploaded_file:
            physical_info = physical_sessions[physical_sessions["Username"] == username]
            physical_group = physical_info["Session Code"].values[0] if not physical_info.empty else None
            physical_group_time = physical_info["Event Start Time"].values[0] if not physical_info.empty else None
+
            def find_alternative_group(day, time):
                if pd.isna(time):
                    return None, None, None
@@ -89,20 +90,24 @@ if uploaded_file:
                "New Group Time": new_group_time,
                "New Group Student Count": new_group_count
            })
-       group_details_df = pd.DataFrame([
-           {
+
+       all_sessions = pd.concat([connect_sessions_l1, connect_sessions_l2])
+       for session_code in groups["Session Code"].unique():
+           initial_count = all_sessions[all_sessions["Session Code"] == session_code].shape[0]
+           final_count = group_counts.get(session_code, initial_count)
+           action = "Increased" if final_count > initial_count else "Decreased" if final_count < initial_count else "No Change"
+           group_details.append({
                "Session Code": session_code,
                "Event Start Time": groups.loc[groups["Session Code"] == session_code, "Event Start Time"].values[0] if session_code in groups["Session Code"].values else None,
-               "Initial Student Count": connect_sessions[connect_sessions["Session Code"] == session_code].shape[0],
-               "Final Student Count": group_counts.get(session_code, connect_sessions[connect_sessions["Session Code"] == session_code].shape[0]),
-               "Change": group_counts.get(session_code, connect_sessions[connect_sessions["Session Code"] == session_code].shape[0]) - connect_sessions[connect_sessions["Session Code"] == session_code].shape[0]
-           }
-           for session_code in set(groups["Session Code"])
-       ])
-       return pd.DataFrame(results), group_details_df
+               "Weekday": groups.loc[groups["Session Code"] == session_code, "Weekday"].values[0] if session_code in groups["Session Code"].values else None,
+               "Initial Student Count": initial_count,
+               "Final Student Count": final_count,
+               "Change": final_count - initial_count,
+               "Action": action
+           })
+       return pd.DataFrame(results), pd.DataFrame(group_details)
    processed_l1, group_details_l1 = process_requests(session_requests_l1, connect_sessions_l1)
    processed_l2, group_details_l2 = process_requests(session_requests_l2, connect_sessions_l2)
-
    final_group_details = pd.concat([group_details_l1, group_details_l2]).drop_duplicates(subset=["Session Code"])
    st.write("### Group Details")
    st.dataframe(final_group_details)
@@ -112,9 +117,4 @@ if uploaded_file:
        processed_l2.to_excel(writer, sheet_name="Session Requests L2", index=False)
        final_group_details.to_excel(writer, sheet_name="Group Details", index=False)
    output_buffer.seek(0)
-   st.download_button(
-       label="💾 Download Processed Data",
-       data=output_buffer,
-       file_name="session_requests_fixed.xlsx",
-       mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-   )
+   st.download_button(label="💾 Download Processed Data", data=output_buffer, file_name="session_requests_fixed.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
