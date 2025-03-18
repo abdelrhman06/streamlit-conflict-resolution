@@ -10,34 +10,34 @@ This application was developed by **Abdelrahman Salah**.
 Dedicated to **the Connect Team**.
 Part of **Almentor**.
 """)
-# 📌 **تحميل الملف**
+
 uploaded_file = st.file_uploader("Upload the Excel file", type=["xlsx"])
 if uploaded_file:
    xls = pd.ExcelFile(uploaded_file)
-   # ✅ **تحميل البيانات**
+
    physical_sessions = pd.read_excel(xls, sheet_name='Physical Sessions')
    connect_sessions_l1 = pd.read_excel(xls, sheet_name='Connect Sessions L1')
    connect_sessions_l2 = pd.read_excel(xls, sheet_name='Connect Sessions L2')
    groups = pd.read_excel(xls, sheet_name='Groups')
    session_requests_l1 = pd.read_excel(xls, sheet_name='Session Requests L1')
    session_requests_l2 = pd.read_excel(xls, sheet_name='Session Requests L2')
-   # ✅ **تنظيف أسماء الأعمدة**
+
    groups.columns = groups.columns.str.strip()
-   # ✅ **تحويل التواريخ والأوقات**
+
    for df in [physical_sessions, connect_sessions_l1, connect_sessions_l2]:
        df["Event Start Date"] = pd.to_datetime(df["Event Start Date"])
-       df["Weekday"] = df["Event Start Date"].dt.day_name()  # استخراج اليوم
+       df["Weekday"] = df["Event Start Date"].dt.day_name()  
        df["Event Start Time"] = df["Event Start Date"].dt.strftime("%H:%M:%S")
        df["Event Start Time"] = pd.to_datetime(df["Event Start Time"], format="%H:%M:%S", errors="coerce").dt.time
    groups["Event Start Time"] = pd.to_datetime(groups["Event Start Time"], format="%H:%M:%S", errors="coerce").dt.time
-   # ✅ **استخراج اللغة من Session Code**
+
    def determine_language(session_code):
        if pd.isna(session_code):
            return None
        return "Arabic" if "A" in session_code else "English"
    connect_sessions_l1["Language"] = connect_sessions_l1["Session Code"].apply(determine_language)
    connect_sessions_l2["Language"] = connect_sessions_l2["Session Code"].apply(determine_language)
-   # ✅ **البحث عن جروب بديل مع التحقق من التعارض**
+   
    def find_alternative_group_with_conflict(day, time, language, physical_time, group_counts):
        if pd.isna(time):
            return "No Suitable Group", None, None, None, None  
@@ -69,7 +69,7 @@ if uploaded_file:
                best_group["Current Student Count"]
            )
        return "No Suitable Group", None, None, None, None  
-   # ✅ **معالجة الطلبات مع إضافة عمود `Conflict`**
+   
    def process_requests_with_conflict_flag(session_requests, connect_sessions, physical_sessions):
        results = []
        group_counts = connect_sessions["Session Code"].value_counts().to_dict()
@@ -110,7 +110,11 @@ if uploaded_file:
                "Old Group": old_group,
                "Physical Group": physical_group,
                "Physical Group Time": physical_group_time,
-               "Requested Day": row["Requested Day"],
+                "Requested Day": row [requested_day],
+               "Requested Day2": row [requested_day2],
+               "Requested Time": row [requested_time],
+               "Alternative Time 1": row [alternative_time1],
+               "Alternative Time 2": row [alternative_time2],
                "New Group": new_group,
                "New Group Time": new_group_time,
                "New Group Language": new_group_language,
