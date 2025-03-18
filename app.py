@@ -10,35 +10,35 @@ This application was developed by **Abdelrahman Salah**.
 Dedicated to **the Connect Team**.
 Part of **Almentor**.
 """)
-
+# 📌 **تحميل الملف**
 uploaded_file = st.file_uploader("Upload the Excel file", type=["xlsx"])
 if uploaded_file:
    xls = pd.ExcelFile(uploaded_file)
-
+   # ✅ **تحميل البيانات**
    physical_sessions = pd.read_excel(xls, sheet_name='Physical Sessions')
    connect_sessions_l1 = pd.read_excel(xls, sheet_name='Connect Sessions L1')
    connect_sessions_l2 = pd.read_excel(xls, sheet_name='Connect Sessions L2')
    groups = pd.read_excel(xls, sheet_name='Groups')
    session_requests_l1 = pd.read_excel(xls, sheet_name='Session Requests L1')
    session_requests_l2 = pd.read_excel(xls, sheet_name='Session Requests L2')
-
+   # ✅ **تنظيف أسماء الأعمدة**
    groups.columns = groups.columns.str.strip()
-
+   # ✅ **تحويل التواريخ والأوقات**
    for df in [physical_sessions, connect_sessions_l1, connect_sessions_l2]:
        df["Event Start Date"] = pd.to_datetime(df["Event Start Date"])
-       df["Weekday"] = df["Event Start Date"].dt.day_name()  
+       df["Weekday"] = df["Event Start Date"].dt.day_name()
        df["Event Start Time"] = df["Event Start Date"].dt.strftime("%H:%M:%S")
        df["Event Start Time"] = pd.to_datetime(df["Event Start Time"], format="%H:%M:%S", errors="coerce").dt.time
    groups["Event Start Time"] = pd.to_datetime(groups["Event Start Time"], format="%H:%M:%S", errors="coerce").dt.time
-
+   # ✅ **استخراج اللغة من Session Code**
    def determine_language(session_code):
        if pd.isna(session_code):
            return None
        return "Arabic" if "A" in session_code else "English"
    connect_sessions_l1["Language"] = connect_sessions_l1["Session Code"].apply(determine_language)
    connect_sessions_l2["Language"] = connect_sessions_l2["Session Code"].apply(determine_language)
-   
-   def find_alternative_group_with_conflict(day, time, language, physical_time, group_counts):
+   # ✅ **البحث عن جروب بديل مع التأكد من عدم التعارض**
+   def find_alternative_group_with_conflict_fixed(day, time, language, physical_time, group_counts):
        if pd.isna(time):
            return "No Suitable Group", None, None, None, None  
        possible_groups = groups[
@@ -69,14 +69,17 @@ if uploaded_file:
                best_group["Current Student Count"]
            )
        return "No Suitable Group", None, None, None, None  
-   
-   def process_requests_with_conflict_flag(session_requests, connect_sessions, physical_sessions):
+   # ✅ **معالجة الطلبات مع إضافة الأعمدة الجديدة**
+   def process_requests_with_full_columns_fixed(session_requests, connect_sessions, physical_sessions):
        results = []
        group_counts = connect_sessions["Session Code"].value_counts().to_dict()
        for _, row in session_requests.iterrows():
            username = row["Username"]
-           day_options = [row["Requested Day"], row["Requested Day2"]]
-           time_options = [row["Requested Time"], row["Alternative Time 1"], row["Alternative Time 2"]]
+           requested_day = row["Requested Day"]
+           requested_day2 = row["Requested Day2"]
+           requested_time = row["Requested Time"]
+           alternative_time1 = row["Alternative Time 1"]
+           alternative_time2 = row["Alternative Time 2"]
            student_info = connect_sessions[connect_sessions["Username"] == username]
            old_group = student_info.iloc[0]["Session Code"] if not student_info.empty else None
            old_group_language = student_info.iloc[0]["Language"] if not student_info.empty else None
@@ -87,9 +90,9 @@ if uploaded_file:
            physical_group_day = physical_info["Weekday"].values[0] if not physical_info.empty else None
            new_group, new_group_day, new_group_time, new_group_language, new_group_count = "No Suitable Group", None, None, None, None
            conflict_flag = False  
-           for day in day_options:
-               for time in time_options:
-                   temp_group, temp_day, temp_time, temp_language, temp_count = find_alternative_group_with_conflict(
+           for day in [requested_day, requested_day2]:
+               for time in [requested_time, alternative_time1, alternative_time2]:
+                   temp_group, temp_day, temp_time, temp_language, temp_count = find_alternative_group_with_conflict_fixed(
                        day, time, old_group_language, physical_group_time, group_counts
                    )
                    if temp_group != "No Suitable Group":
@@ -107,28 +110,23 @@ if uploaded_file:
                    break
            results.append({
                "Username": username,
-               "Old Group": old_group,
+               "Requested Day": requested_day,
+               "Requested Day2": requested_day2,
+               "Requested Time": requested_time,
+               "Alternative Time 1": alternative_time1,
+               "Alternative Time 2": alternative_time2,
                "Physical Group": physical_group,
+               "Physical Group Weekday": physical_group_day,
                "Physical Group Time": physical_group_time,
-                "Requested Day": row [requested_day],
-               "Requested Day2": row [requested_day2],
-               "Requested Time": row [requested_time],
-               "Alternative Time 1": row [alternative_time1],
-               "Alternative Time 2": row [alternative_time2],
                "New Group": new_group,
+               "New Group Day": new_group_day,
                "New Group Time": new_group_time,
                "New Group Language": new_group_language,
                "New Group Student Count": new_group_count,
-               "Conflict": conflict_flag  
+               "Conflict": conflict_flag
            })
        return pd.DataFrame(results)
-   processed_l1 = process_requests_with_conflict_flag(session_requests_l1, connect_sessions_l1, physical_sessions)
-   processed_l2 = process_requests_with_conflict_flag(session_requests_l2, connect_sessions_l2, physical_sessions)
+   processed_l1 = process_requests_with_full_columns_fixed(session_requests_l1, connect_sessions_l1, physical_sessions)
+   processed_l2 = process_requests_with_full_columns_fixed(session_requests_l2, connect_sessions_l2, physical_sessions)
    st.dataframe(processed_l1)
    st.dataframe(processed_l2)
-   output_buffer = io.BytesIO()
-   with pd.ExcelWriter(output_buffer, engine='xlsxwriter') as writer:
-       processed_l1.to_excel(writer, sheet_name="Session Requests L1", index=False)
-       processed_l2.to_excel(writer, sheet_name="Session Requests L2", index=False)
-   output_buffer.seek(0)
-   st.download_button(label="💾 Download Processed Data", data=output_buffer, file_name="session_requests_final.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
