@@ -69,8 +69,8 @@ if uploaded_file:
                best_group["Current Student Count"]
            )
        return "No Suitable Group", None, None, None, None  
-   # ✅ **معالجة الطلبات مع إضافة الأعمدة الجديدة**
-   def process_requests_with_full_columns_fixed(session_requests, connect_sessions, physical_sessions):
+   # ✅ **معالجة الطلبات**
+   def process_requests(session_requests, connect_sessions, physical_sessions):
        results = []
        group_counts = connect_sessions["Session Code"].value_counts().to_dict()
        for _, row in session_requests.iterrows():
@@ -126,7 +126,11 @@ if uploaded_file:
                "Conflict": conflict_flag
            })
        return pd.DataFrame(results)
-   processed_l1 = process_requests_with_full_columns_fixed(session_requests_l1, connect_sessions_l1, physical_sessions)
-   processed_l2 = process_requests_with_full_columns_fixed(session_requests_l2, connect_sessions_l2, physical_sessions)
-   st.dataframe(processed_l1)
-   st.dataframe(processed_l2)
+   processed_l1 = process_requests(session_requests_l1, connect_sessions_l1, physical_sessions)
+   processed_l2 = process_requests(session_requests_l2, connect_sessions_l2, physical_sessions)
+   st.download_button(
+       label="💾 Download Processed Data",
+       data=processed_l1.to_csv(index=False),
+       file_name="session_requests_final.csv",
+       mime="text/csv"
+   )
