@@ -21,12 +21,6 @@ if uploaded_file:
    groups = pd.read_excel(xls, sheet_name='Groups')
    session_requests_l1 = pd.read_excel(xls, sheet_name='Session Requests L1')
    session_requests_l2 = pd.read_excel(xls, sheet_name='Session Requests L2')
-   # ✅ **تحقق من البيانات قبل المعالجة**
-   st.write("🔍 Checking Data:")
-   st.write("Session Requests L1:", session_requests_l1.shape)
-   st.write("Connect Sessions L1:", connect_sessions_l1.shape)
-   st.write("Session Requests L2:", session_requests_l2.shape)
-   st.write("Connect Sessions L2:", connect_sessions_l2.shape)
    # ✅ **تنظيف أسماء الأعمدة**
    groups.columns = groups.columns.str.strip()
    # ✅ **تحويل التواريخ والأوقات**
@@ -75,8 +69,8 @@ if uploaded_file:
                best_group["Current Student Count"]
            )
        return "No Suitable Group", None, None, None, None  
-   # ✅ **معالجة الطلبات**
-   def process_requests(session_requests, connect_sessions, physical_sessions):
+   # ✅ **معالجة الطلبات مع إضافة الأعمدة الجديدة**
+   def process_requests_with_full_columns_fixed(session_requests, connect_sessions, physical_sessions):
        results = []
        group_counts = connect_sessions["Session Code"].value_counts().to_dict()
        for _, row in session_requests.iterrows():
@@ -116,20 +110,23 @@ if uploaded_file:
                    break
            results.append({
                "Username": username,
+               "Requested Day": requested_day,
+               "Requested Day2": requested_day2,
+               "Requested Time": requested_time,
+               "Alternative Time 1": alternative_time1,
+               "Alternative Time 2": alternative_time2,
+               "Physical Group": physical_group,
+               "Physical Group Weekday": physical_group_day,
+               "Physical Group Time": physical_group_time,
                "New Group": new_group,
+               "New Group Day": new_group_day,
+               "New Group Time": new_group_time,
+               "New Group Language": new_group_language,
+               "New Group Student Count": new_group_count,
                "Conflict": conflict_flag
            })
        return pd.DataFrame(results)
-   processed_l1 = process_requests(session_requests_l1, connect_sessions_l1, physical_sessions)
-   processed_l2 = process_requests(session_requests_l2, connect_sessions_l2, physical_sessions)
-   st.write("### Processed Session Requests L2")
-   if not processed_l2.empty:
-       st.dataframe(processed_l2)
-   else:
-       st.write("⚠ No Data Available for Level 2")
-   st.download_button(
-       label="💾 Download Processed Data",
-       data=processed_l1.to_csv(index=False),
-       file_name="session_requests_final.csv",
-       mime="text/csv"
-   )
+   processed_l1 = process_requests_with_full_columns_fixed(session_requests_l1, connect_sessions_l1, physical_sessions)
+   processed_l2 = process_requests_with_full_columns_fixed(session_requests_l2, connect_sessions_l2, physical_sessions)
+   st.dataframe(processed_l1)
+   st.dataframe(processed_l2)
