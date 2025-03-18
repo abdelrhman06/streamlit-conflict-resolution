@@ -10,27 +10,27 @@ This application was developed by **Abdelrahman Salah**.
 Dedicated to **the Connect Team**.
 Part of **Almentor**.
 """)
-
+# 📌 **تحميل الملف**
 uploaded_file = st.file_uploader("Upload the Excel file", type=["xlsx"])
 if uploaded_file:
    xls = pd.ExcelFile(uploaded_file)
-
+   # ✅ **تحميل البيانات**
    physical_sessions = pd.read_excel(xls, sheet_name='Physical Sessions')
    connect_sessions_l1 = pd.read_excel(xls, sheet_name='Connect Sessions L1')
    connect_sessions_l2 = pd.read_excel(xls, sheet_name='Connect Sessions L2')
    groups = pd.read_excel(xls, sheet_name='Groups')
    session_requests_l1 = pd.read_excel(xls, sheet_name='Session Requests L1')
    session_requests_l2 = pd.read_excel(xls, sheet_name='Session Requests L2')
- 
+   # ✅ **تنظيف أسماء الأعمدة**
    groups.columns = groups.columns.str.strip()
-
+   # ✅ **تحويل التواريخ والأوقات**
    for df in [physical_sessions, connect_sessions_l1, connect_sessions_l2]:
        df["Event Start Date"] = pd.to_datetime(df["Event Start Date"])
        df["Weekday"] = df["Event Start Date"].dt.day_name()
        df["Event Start Time"] = df["Event Start Date"].dt.strftime("%H:%M:%S")
        df["Event Start Time"] = pd.to_datetime(df["Event Start Time"], format="%H:%M:%S", errors="coerce").dt.time
    groups["Event Start Time"] = pd.to_datetime(groups["Event Start Time"], format="%H:%M:%S", errors="coerce").dt.time
-  
+   # ✅ **تحديد اللغة في Connect Sessions**
    def determine_language(session_code, level):
        if pd.isna(session_code):
            return None
@@ -41,7 +41,7 @@ if uploaded_file:
        return None
    connect_sessions_l1["Language"] = connect_sessions_l1["Session Code"].apply(lambda x: determine_language(x, "L1"))
    connect_sessions_l2["Language"] = connect_sessions_l2["Session Code"].apply(lambda x: determine_language(x, "L2"))
-
+   # ✅ **معالجة الطلبات**
    def process_requests(session_requests, connect_sessions):
        results = []
        group_counts = {session_code: connect_sessions[connect_sessions["Session Code"] == session_code].shape[0] for session_code in groups["Session Code"].unique()}
@@ -59,7 +59,7 @@ if uploaded_file:
            physical_info = physical_sessions[physical_sessions["Username"] == username]
            physical_group = physical_info["Session Code"].values[0] if not physical_info.empty else None
            physical_group_time = physical_info["Event Start Time"].values[0] if not physical_info.empty else None
-         
+           # ✅ **البحث عن جروب بديل بنفس اللغة**
            def find_alternative_group(day, time, language):
                if pd.isna(time):
                    return None, None, None, None
@@ -96,16 +96,12 @@ if uploaded_file:
        return pd.DataFrame(results)
    processed_l1 = process_requests(session_requests_l1, connect_sessions_l1)
    processed_l2 = process_requests(session_requests_l2, connect_sessions_l2)
-
+   # ✅ **حساب Final Student Count بعد التعديلات**
    all_connect_sessions = pd.concat([connect_sessions_l1, connect_sessions_l2])
-   group_details = (
-       all_connect_sessions.groupby("Session Code")
-       .size()
-       .reset_index(name="Initial Student Count")
-   )
-   group_details["Final Student Count"] = group_details["Session Code"].map(lambda x: processed_l1["New Group"].tolist().count(x) + processed_l2["New Group"].tolist().count(x))
+   group_details = all_connect_sessions.groupby("Session Code").size().reset_index(name="Initial Student Count")
+   group_details["Final Student Count"] = group_details["Session Code"].apply(lambda x: (processed_l1["New Group"].tolist() + processed_l2["New Group"].tolist()).count(x))
    group_details["Change"] = group_details["Final Student Count"] - group_details["Initial Student Count"]
-
+   # ✅ **تحميل الملف النهائي**
    output_buffer = io.BytesIO()
    with pd.ExcelWriter(output_buffer, engine='xlsxwriter') as writer:
        processed_l1.to_excel(writer, sheet_name="Session Requests L1", index=False)
