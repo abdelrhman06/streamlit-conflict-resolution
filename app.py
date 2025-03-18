@@ -53,6 +53,7 @@ if uploaded_file:
            student_info = connect_sessions[connect_sessions["Username"] == username]
            old_group = student_info.iloc[0]["Session Code"] if not student_info.empty else None
            old_group_language = student_info.iloc[0]["Language"] if not student_info.empty else None
+           old_group_time = student_info.iloc[0]["Event Start Time"] if not student_info.empty else None
            # ✅ **البحث عن جروب بديل**
            def find_alternative_group(day, time, language):
                if pd.isna(time):
@@ -96,22 +97,18 @@ if uploaded_file:
                "New Group Student Count": new_group_count
            })
        return pd.DataFrame(results)
-   # ✅ **إنشاء بيانات الجروبات قبل وبعد التوزيع**
-   def generate_group_details():
-       all_sessions = pd.concat([connect_sessions_l1, connect_sessions_l2])
-       initial_counts = all_sessions["Session Code"].value_counts().reset_index()
-       initial_counts.columns = ["Session Code", "Initial Student Count"]
-       final_counts = processed_l1["New Group"].value_counts().add(
-           processed_l2["New Group"].value_counts(), fill_value=0
-       ).reset_index()
-       final_counts.columns = ["Session Code", "Final Student Count"]
-       group_details = groups.merge(initial_counts, on="Session Code", how="left").merge(final_counts, on="Session Code", how="left")
-       group_details["Initial Student Count"] = group_details["Initial Student Count"].fillna(0).astype(int)
-       group_details["Final Student Count"] = group_details["Final Student Count"].fillna(0).astype(int)
-       group_details["Change"] = group_details["Final Student Count"] - group_details["Initial Student Count"]
-       group_details["Action"] = group_details["Change"].apply(lambda x: "Increased" if x > 0 else "Decreased" if x < 0 else "No Change")
-       return group_details
+   # ✅ **تشغيل معالجة الطلبات**
    processed_l1 = process_requests(session_requests_l1, connect_sessions_l1)
    processed_l2 = process_requests(session_requests_l2, connect_sessions_l2)
-   group_details_final = generate_group_details()
-   st.dataframe(group_details_final)
+   # ✅ **عرض البيانات النهائية**
+   st.write("### Processed Session Requests L1")
+   st.dataframe(processed_l1)
+   st.write("### Processed Session Requests L2")
+   st.dataframe(processed_l2)
+   # ✅ **تحميل الملف النهائي**
+   output_buffer = io.BytesIO()
+   with pd.ExcelWriter(output_buffer, engine='xlsxwriter') as writer:
+       processed_l1.to_excel(writer, sheet_name="Session Requests L1", index=False)
+       processed_l2.to_excel(writer, sheet_name="Session Requests L2", index=False)
+   output_buffer.seek(0)
+   st.download_button(label="💾 Download Processed Data", data=output_buffer, file_name="session_requests_fixed.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
