@@ -14,30 +14,25 @@ Part of **Almentor**.
 uploaded_file = st.file_uploader("Upload the Excel file", type=["xlsx"])
 if uploaded_file:
    xls = pd.ExcelFile(uploaded_file)
-
    physical_sessions = pd.read_excel(xls, sheet_name='Physical Sessions')
    connect_sessions_l1 = pd.read_excel(xls, sheet_name='Connect Sessions L1')
    connect_sessions_l2 = pd.read_excel(xls, sheet_name='Connect Sessions L2')
    groups = pd.read_excel(xls, sheet_name='Groups')
    session_requests_l1 = pd.read_excel(xls, sheet_name='Session Requests L1')
    session_requests_l2 = pd.read_excel(xls, sheet_name='Session Requests L2')
-
    groups.columns = groups.columns.str.strip()
-
    for df in [physical_sessions, connect_sessions_l1, connect_sessions_l2]:
        df["Event Start Date"] = pd.to_datetime(df["Event Start Date"])
        df["Weekday"] = df["Event Start Date"].dt.day_name()
        df["Event Start Time"] = df["Event Start Date"].dt.strftime("%H:%M:%S")
        df["Event Start Time"] = pd.to_datetime(df["Event Start Time"], format="%H:%M:%S", errors="coerce").dt.time
    groups["Event Start Time"] = pd.to_datetime(groups["Event Start Time"], format="%H:%M:%S", errors="coerce").dt.time
-
    def determine_language(session_code):
        if pd.isna(session_code):
            return None
        return "Arabic" if "A" in session_code else "English"
    connect_sessions_l1["Language"] = connect_sessions_l1["Session Code"].apply(determine_language)
    connect_sessions_l2["Language"] = connect_sessions_l2["Session Code"].apply(determine_language)
-
    def find_alternative_group(day, time, language, physical_time, group_counts, ignore_conflict=False):
        if pd.isna(time):
            return "No Suitable Group", None, None, None, None
@@ -69,7 +64,6 @@ if uploaded_file:
                best_group["Current Student Count"]
            )
        return "No Suitable Group", None, None, None, None
-
    def process_requests_with_fallback(session_requests, connect_sessions, physical_sessions):
        results = []
        group_counts = connect_sessions["Session Code"].value_counts().to_dict()
@@ -90,7 +84,7 @@ if uploaded_file:
            physical_group_day = physical_info["Weekday"].values[0] if not physical_info.empty else None
            new_group, new_group_day, new_group_time, new_group_language, new_group_count = "No Suitable Group", None, None, None, None
            conflict_flag = False
- 
+        
            for day in [requested_day, requested_day2]:
                for time in [requested_time, alternative_time1, alternative_time2]:
                    temp_group, temp_day, temp_time, temp_language, temp_count = find_alternative_group(
@@ -105,7 +99,7 @@ if uploaded_file:
                        break
                if new_group != "No Suitable Group":
                    break
-       
+        
            if new_group == "No Suitable Group":
                for day in [requested_day, requested_day2]:
                    for time in [requested_time, alternative_time1, alternative_time2]:
@@ -140,7 +134,20 @@ if uploaded_file:
                "Conflict": conflict_flag
            })
        return pd.DataFrame(results)
+
    processed_l1 = process_requests_with_fallback(session_requests_l1, connect_sessions_l1, physical_sessions)
    processed_l2 = process_requests_with_fallback(session_requests_l2, connect_sessions_l2, physical_sessions)
    st.dataframe(processed_l1)
    st.dataframe(processed_l2)
+
+   output = io.BytesIO()
+   with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+       processed_l1.to_excel(writer, sheet_name="Processed L1", index=False)
+       processed_l2.to_excel(writer, sheet_name="Processed L2", index=False)
+   output.seek(0)
+   st.download_button(
+       label="📊 Download Results as Excel",
+       data=output,
+       file_name="group_reassignment_results.xlsx",
+       mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+   )
