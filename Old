@@ -21,7 +21,6 @@ if uploaded_file:
    session_requests_l1 = pd.read_excel(xls, sheet_name='Session Requests L1')
    session_requests_l2 = pd.read_excel(xls, sheet_name='Session Requests L2')
    groups.columns = groups.columns.str.strip()
-   
    for df in [physical_sessions, connect_sessions_l1, connect_sessions_l2]:
        df["Event Start Date"] = pd.to_datetime(df["Event Start Date"])
        df["Weekday"] = df["Event Start Date"].dt.day_name()
@@ -85,6 +84,7 @@ if uploaded_file:
            physical_group_day = physical_info["Weekday"].values[0] if not physical_info.empty else None
            new_group, new_group_day, new_group_time, new_group_language, new_group_count = "No Suitable Group", None, None, None, None
            conflict_flag = False
+        
            for day in [requested_day, requested_day2]:
                for time in [requested_time, alternative_time1, alternative_time2]:
                    temp_group, temp_day, temp_time, temp_language, temp_count = find_alternative_group(
@@ -99,7 +99,8 @@ if uploaded_file:
                        break
                if new_group != "No Suitable Group":
                    break
-           if new_group == "No Suitable Group" and pd.isna(physical_group_time):
+        
+           if new_group == "No Suitable Group":
                for day in [requested_day, requested_day2]:
                    for time in [requested_time, alternative_time1, alternative_time2]:
                        temp_group, temp_day, temp_time, temp_language, temp_count = find_alternative_group(
@@ -145,7 +146,7 @@ if uploaded_file:
        processed_l2.to_excel(writer, sheet_name="Processed L2", index=False)
    output.seek(0)
    st.download_button(
-       label="📥 Download Results as Excel",
+       label="📊 Download Results as Excel",
        data=output,
        file_name="group_reassignment_results.xlsx",
        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
