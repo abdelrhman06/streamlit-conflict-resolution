@@ -10,46 +10,46 @@ This application was developed by **Abdelrahman Salah**.
 Dedicated to **the Connect Team**.
 Part of **Almentor**.
 """)
-# 📌 **تحميل الملف**
+
 uploaded_file = st.file_uploader("Upload the Excel file", type=["xlsx"])
 if uploaded_file:
    xls = pd.ExcelFile(uploaded_file)
-   # ✅ **تحميل البيانات**
+
    physical_sessions = pd.read_excel(xls, sheet_name='Physical Sessions')
    connect_sessions_l1 = pd.read_excel(xls, sheet_name='Connect Sessions L1')
    connect_sessions_l2 = pd.read_excel(xls, sheet_name='Connect Sessions L2')
    groups = pd.read_excel(xls, sheet_name='Groups')
    session_requests_l1 = pd.read_excel(xls, sheet_name='Session Requests L1')
    session_requests_l2 = pd.read_excel(xls, sheet_name='Session Requests L2')
-   # ✅ **تنظيف أسماء الأعمدة**
+
    groups.columns = groups.columns.str.strip()
-   # ✅ **تحويل التواريخ والأوقات**
+
    for df in [physical_sessions, connect_sessions_l1, connect_sessions_l2]:
        df["Event Start Date"] = pd.to_datetime(df["Event Start Date"])
        df["Weekday"] = df["Event Start Date"].dt.day_name()
        df["Event Start Time"] = df["Event Start Date"].dt.strftime("%H:%M:%S")
        df["Event Start Time"] = pd.to_datetime(df["Event Start Time"], format="%H:%M:%S", errors="coerce").dt.time
    groups["Event Start Time"] = pd.to_datetime(groups["Event Start Time"], format="%H:%M:%S", errors="coerce").dt.time
-   # ✅ **استخراج اللغة من Session Code**
+
    def determine_language(session_code):
        if pd.isna(session_code):
            return None
        return "Arabic" if "A" in session_code else "English"
    connect_sessions_l1["Language"] = connect_sessions_l1["Session Code"].apply(determine_language)
    connect_sessions_l2["Language"] = connect_sessions_l2["Session Code"].apply(determine_language)
-   # ✅ **البحث عن جروب بديل مع التأكد من عدم التعارض**
-   def find_alternative_group_with_conflict_fixed(day, time, language, physical_time, group_counts):
+
+   def find_alternative_group(day, time, language, physical_time, group_counts, ignore_conflict=False):
        if pd.isna(time):
-           return "No Suitable Group", None, None, None, None  
+           return "No Suitable Group", None, None, None, None
        possible_groups = groups[
            (groups["Weekday"] == day) &
            (groups["Event Start Time"] == time) &
            (groups["Session Code"].apply(determine_language) == language)
        ].copy()
        if possible_groups.empty:
-           return "No Suitable Group", None, None, None, None  
+           return "No Suitable Group", None, None, None, None
        possible_groups["Current Student Count"] = possible_groups["Session Code"].map(group_counts).fillna(0).astype(int)
-       if not pd.isna(physical_time):
+       if not pd.isna(physical_time) and not ignore_conflict:
            possible_groups = possible_groups[
                possible_groups["Event Start Time"].apply(
                    lambda t: abs((pd.to_datetime(t, format="%H:%M:%S") - pd.to_datetime(physical_time, format="%H:%M:%S")).total_seconds()) / 3600 >= 2.5
@@ -68,9 +68,9 @@ if uploaded_file:
                determine_language(best_group["Session Code"]),
                best_group["Current Student Count"]
            )
-       return "No Suitable Group", None, None, None, None  
-   # ✅ **معالجة الطلبات مع إضافة الأعمدة الجديدة**
-   def process_requests_with_full_columns_fixed(session_requests, connect_sessions, physical_sessions):
+       return "No Suitable Group", None, None, None, None
+
+   def process_requests_with_fallback(session_requests, connect_sessions, physical_sessions):
        results = []
        group_counts = connect_sessions["Session Code"].value_counts().to_dict()
        for _, row in session_requests.iterrows():
@@ -89,25 +89,39 @@ if uploaded_file:
            physical_group_time = physical_info["Event Start Time"].values[0] if not physical_info.empty else None
            physical_group_day = physical_info["Weekday"].values[0] if not physical_info.empty else None
            new_group, new_group_day, new_group_time, new_group_language, new_group_count = "No Suitable Group", None, None, None, None
-           conflict_flag = False  
+           conflict_flag = False
+ 
            for day in [requested_day, requested_day2]:
                for time in [requested_time, alternative_time1, alternative_time2]:
-                   temp_group, temp_day, temp_time, temp_language, temp_count = find_alternative_group_with_conflict_fixed(
-                       day, time, old_group_language, physical_group_time, group_counts
+                   temp_group, temp_day, temp_time, temp_language, temp_count = find_alternative_group(
+                       day, time, old_group_language, physical_group_time, group_counts, ignore_conflict=False
                    )
                    if temp_group != "No Suitable Group":
                        new_group, new_group_day, new_group_time, new_group_language = temp_group, temp_day, temp_time, temp_language
-                       if not pd.isna(physical_group_time) and not pd.isna(temp_time):
-                           time_diff = abs((pd.to_datetime(temp_time, format="%H:%M:%S") - pd.to_datetime(physical_group_time, format="%H:%M:%S")).total_seconds()) / 3600
-                           if time_diff < 2.5:
-                               conflict_flag = True  
                        group_counts[new_group] = group_counts.get(new_group, 0) + 1
                        if old_group and old_group in group_counts:
                            group_counts[old_group] = max(group_counts[old_group] - 1, 0)
-                       new_group_count = group_counts[new_group]  
+                       new_group_count = group_counts[new_group]
                        break
                if new_group != "No Suitable Group":
                    break
+       
+           if new_group == "No Suitable Group":
+               for day in [requested_day, requested_day2]:
+                   for time in [requested_time, alternative_time1, alternative_time2]:
+                       temp_group, temp_day, temp_time, temp_language, temp_count = find_alternative_group(
+                           day, time, old_group_language, physical_group_time, group_counts, ignore_conflict=True
+                       )
+                       if temp_group != "No Suitable Group":
+                           new_group, new_group_day, new_group_time, new_group_language = temp_group, temp_day, temp_time, temp_language
+                           group_counts[new_group] = group_counts.get(new_group, 0) + 1
+                           if old_group and old_group in group_counts:
+                               group_counts[old_group] = max(group_counts[old_group] - 1, 0)
+                           new_group_count = group_counts[new_group]
+                           conflict_flag = True
+                           break
+                   if new_group != "No Suitable Group":
+                       break
            results.append({
                "Username": username,
                "Requested Day": requested_day,
@@ -126,7 +140,7 @@ if uploaded_file:
                "Conflict": conflict_flag
            })
        return pd.DataFrame(results)
-   processed_l1 = process_requests_with_full_columns_fixed(session_requests_l1, connect_sessions_l1, physical_sessions)
-   processed_l2 = process_requests_with_full_columns_fixed(session_requests_l2, connect_sessions_l2, physical_sessions)
+   processed_l1 = process_requests_with_fallback(session_requests_l1, connect_sessions_l1, physical_sessions)
+   processed_l2 = process_requests_with_fallback(session_requests_l2, connect_sessions_l2, physical_sessions)
    st.dataframe(processed_l1)
    st.dataframe(processed_l2)
