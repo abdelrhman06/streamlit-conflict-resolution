@@ -4,7 +4,7 @@ import numpy as np
 import io
 from datetime import datetime
 
-st.title("\ud83d\udcca Finding Another Group for Students")
+st.title("📊 Finding Another Group for Students")
 st.write("""
 Enter the day and time the student wants to find a new group that suits them.
 This application was developed by **Abdelrahman Salah**.
